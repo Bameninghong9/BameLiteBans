@@ -89,7 +89,9 @@ data class PunishmentEntry(
             else -> configService?.expiredTag ?: "<white> [<#828FE7>ᴀʙɢᴇʟᴀᴜꜰᴇɴ<white>]"
         }
 
-        val cleanReason = reason.ifEmpty { "Kein Grund angegeben" }
+        val cleanReason = ColorParser.escape(reason.ifEmpty { "Kein Grund angegeben" })
+        val safeTargetName = ColorParser.escape(targetName)
+        val safeStaffName = ColorParser.escape(staffName)
 
         val dateColor = when (type) {
             PunishmentType.BAN -> "<red>"
@@ -98,10 +100,10 @@ data class PunishmentEntry(
         }
 
         val actionText = when (type) {
-            PunishmentType.BAN -> "<#92F254>$targetName<gray> ᴡᴜʀᴅᴇ <#FF0000>ɢᴇʙᴀɴɴᴛ<gray> ꜰüʀ <#FF4B81>$durationStr <gray>ᴠᴏɴ <white>$staffName<gray>: '<#A7FFEA>$cleanReason<white>'$statusTag"
-            PunishmentType.MUTE -> "<#92F254>$targetName<gray> ᴡᴜʀᴅᴇ <#E9FF00>ɢᴇᴍᴜᴛᴇᴅ<gray> ꜰüʀ <#FF4B81>$durationStr <gray>ᴠᴏɴ <white>$staffName<gray>: '<#A7FFEA>$cleanReason<white>'$statusTag"
-            PunishmentType.WARN -> "<#92F254>$targetName<gray> ᴡᴜʀᴅᴇ <#FF7200>ᴠᴇʀᴡᴀʀɴᴛ <gray>ᴠᴏɴ <white>$staffName<gray>: '<#BCFFA7>$cleanReason<white>'"
-            PunishmentType.KICK -> "<#92F254>$targetName<gray> ᴡᴜʀᴅᴇ <#FFE681>ɢᴇᴋɪᴄᴋᴛ <gray>ᴠᴏɴ <white>$staffName<gray>: '<#BCFFA7>$cleanReason<white>'"
+            PunishmentType.BAN -> "<#92F254>$safeTargetName<gray> ᴡᴜʀᴅᴇ <#FF0000>ɢᴇʙᴀɴɴᴛ<gray> ꜰüʀ <#FF4B81>$durationStr <gray>ᴠᴏɴ <white>$safeStaffName<gray>: '<#A7FFEA>$cleanReason<white>'$statusTag"
+            PunishmentType.MUTE -> "<#92F254>$safeTargetName<gray> ᴡᴜʀᴅᴇ <#E9FF00>ɢᴇᴍᴜᴛᴇᴅ<gray> ꜰüʀ <#FF4B81>$durationStr <gray>ᴠᴏɴ <white>$safeStaffName<gray>: '<#A7FFEA>$cleanReason<white>'$statusTag"
+            PunishmentType.WARN -> "<#92F254>$safeTargetName<gray> ᴡᴜʀᴅᴇ <#FF7200>ᴠᴇʀᴡᴀʀɴᴛ <gray>ᴠᴏɴ <white>$safeStaffName<gray>: '<#BCFFA7>$cleanReason<white>'"
+            PunishmentType.KICK -> "<#92F254>$safeTargetName<gray> ᴡᴜʀᴅᴇ <#FFE681>ɢᴇᴋɪᴄᴋᴛ <gray>ᴠᴏɴ <white>$safeStaffName<gray>: '<#BCFFA7>$cleanReason<white>'"
         }
 
         val lines = mutableListOf<String>()
@@ -114,10 +116,11 @@ data class PunishmentEntry(
 
         if (wasUnbannedOrUnmuted) {
             val dateRemovedStr = formattedRemovedDate()
-            val cleanRemovalReason = removedByReason?.ifEmpty { "Kein Grund angegeben" } ?: "Kein Grund angegeben"
+            val cleanRemovalReason = ColorParser.escape(removedByReason?.ifEmpty { "Kein Grund angegeben" } ?: "Kein Grund angegeben")
+            val safeRemovedByName = ColorParser.escape(removedByName ?: "Konsole")
             val action = if (type == PunishmentType.BAN) "<#C06F6A>ᴇɴᴛʙᴀɴɴᴛ" else "<#A89958>ᴇɴᴛᴍᴜᴛᴇᴅ"
             lines.add("")
-            lines.add("<#92F254>$targetName<gray> ᴡᴜʀᴅᴇ $action <gray>ᴠᴏɴ <white>$removedByName<gray> ᴀᴍ <#65BAFF>$dateRemovedStr<gray>: '<#D6DFB9>$cleanRemovalReason<white>'")
+            lines.add("<#92F254>$safeTargetName<gray> ᴡᴜʀᴅᴇ $action <gray>ᴠᴏɴ <white>$safeRemovedByName<gray> ᴀᴍ <#65BAFF>$dateRemovedStr<gray>: '<#D6DFB9>$cleanRemovalReason<white>'")
         }
 
         return ColorParser.parse(lines.joinToString("\n"))

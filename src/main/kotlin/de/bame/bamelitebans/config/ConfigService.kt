@@ -83,30 +83,30 @@ class ConfigService(private val dataDirectory: Path) {
     fun headerSearch(player: String, reason: String, count: Int): String {
         val template = toml.getString("messages.header_search") ?: "<#FFB700>History for <#92F254>{player} <#FFB700>({reason} '<yellow>{count}<#FFB700>'):"
         return template
-            .replace("{player}", player)
-            .replace("{reason}", reason)
+            .replace("{player}", de.bame.bamelitebans.util.ColorParser.escape(player))
+            .replace("{reason}", de.bame.bamelitebans.util.ColorParser.escape(reason))
             .replace("{count}", count.toString())
     }
 
     fun headerAll(player: String, count: Int): String {
         val template = toml.getString("messages.header_all") ?: "<#FFB700>History for <#92F254>{player} <#FFB700>('<yellow>{count}<#FFB700>'):"
         return template
-            .replace("{player}", player)
+            .replace("{player}", de.bame.bamelitebans.util.ColorParser.escape(player))
             .replace("{count}", count.toString())
     }
 
     fun staffHeaderSearch(staff: String, reason: String, count: Int): String {
         val template = toml.getString("messages.staff_header_search") ?: "<#FFB700>Staff-History for <#92F254>{staff} <#FFB700>({reason} '<yellow>{count}<#FFB700>'):"
         return template
-            .replace("{staff}", staff)
-            .replace("{reason}", reason)
+            .replace("{staff}", de.bame.bamelitebans.util.ColorParser.escape(staff))
+            .replace("{reason}", de.bame.bamelitebans.util.ColorParser.escape(reason))
             .replace("{count}", count.toString())
     }
 
     fun staffHeaderAll(staff: String, count: Int): String {
         val template = toml.getString("messages.staff_header_all") ?: "<#FFB700>Staff-History for <#92F254>{staff} <#FFB700>('<yellow>{count}<#FFB700>'):"
         return template
-            .replace("{staff}", staff)
+            .replace("{staff}", de.bame.bamelitebans.util.ColorParser.escape(staff))
             .replace("{count}", count.toString())
     }
 
@@ -124,12 +124,12 @@ class ConfigService(private val dataDirectory: Path) {
 
     fun stafftopHeader(period: String): String {
         val template = toml.getString("messages.stafftop_header") ?: "<gold>🏆 <green>Staff-Leaderboard ({period}):"
-        return template.replace("{period}", period)
+        return template.replace("{period}", de.bame.bamelitebans.util.ColorParser.escape(period))
     }
 
     fun stafftopEmpty(period: String): String {
         val template = toml.getString("messages.stafftop_empty") ?: "<red>Keine Moderationsaktivität im Zeitraum <yellow>{period} <red>gefunden."
-        return template.replace("{period}", period)
+        return template.replace("{period}", de.bame.bamelitebans.util.ColorParser.escape(period))
     }
 
     fun lastSeenHeader(): String {
@@ -149,9 +149,6 @@ class ConfigService(private val dataDirectory: Path) {
     ): String {
         var template = toml.getString("messages.lastseen_format")
             ?: "{prefix_name}<reset> <gray>{war_zuletzt_am} <#FFFE00>{date} <gray>{um} <#FFFE00>{time} <gray>{auf} <#FFFE00>{server} <gray>{online}"
-        if (template.startsWith("<white>⌚ ")) {
-            template = template.removePrefix("<white>⌚ ").trimStart()
-        }
         if (!template.contains("{online}")) {
             template = "$template <gray>{online}"
         }

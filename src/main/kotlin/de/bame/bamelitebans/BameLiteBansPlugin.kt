@@ -83,6 +83,8 @@ class BameLiteBansPlugin @Inject constructor(
     fun onDisconnect(event: DisconnectEvent) {
         val player = event.player
         val serverName = player.currentServer.map { it.serverInfo.name }.orElse(null)
-        lastSeenService.recordLastSeen(player.uniqueId.toString(), player.username, serverName)
+        if (serverName != null) {
+            lastSeenService.recordLastSeen(player.uniqueId.toString(), player.username, serverName)
+        }
     }
 }

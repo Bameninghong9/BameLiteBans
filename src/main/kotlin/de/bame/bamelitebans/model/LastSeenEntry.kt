@@ -7,5 +7,6 @@ data class LastSeenEntry(
     val uuid: String,
     val name: String,
     val timestampMillis: Long,
-    val server: String
+    val server: String,
+    val isOnline: Boolean = false
 )

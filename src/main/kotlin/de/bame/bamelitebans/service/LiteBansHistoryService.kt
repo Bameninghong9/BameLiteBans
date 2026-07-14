@@ -283,10 +283,15 @@ class LiteBansHistoryService(
             val topList = map.values
                 .filter { it.total > 0 && !it.staffName.equals("Console", true) && !it.staffName.equals("Konsole", true) }
                 .sortedByDescending { it.total }
-                .take(10)
 
             for (entry in topList) {
                 val uuidToUse = entry.staffUuid ?: resolvePlayerUuid(entry.staffName)
+                if (!uuidToUse.isNullOrBlank()) {
+                    val resolvedLatestName = resolvePlayerName(uuidToUse)
+                    if (resolvedLatestName != uuidToUse && resolvedLatestName.isNotBlank()) {
+                        entry.staffName = resolvedLatestName
+                    }
+                }
                 entry.luckPermsPrefix = luckPermsService.getPrefix(uuidToUse)
             }
 
@@ -300,7 +305,7 @@ class LiteBansHistoryService(
         map: MutableMap<String, StaffTopEntry>,
         adder: (StaffTopEntry, Int) -> Unit
     ) {
-        val query = "SELECT banned_by_name, banned_by_uuid, COUNT(*) AS cnt FROM $tableToken WHERE time >= ? AND banned_by_name IS NOT NULL GROUP BY banned_by_name, banned_by_uuid"
+        val query = "SELECT banned_by_name, banned_by_uuid, COUNT(*) AS cnt, MAX(time) AS max_time FROM $tableToken WHERE time >= ? AND banned_by_name IS NOT NULL GROUP BY banned_by_name, banned_by_uuid"
         try {
             Database.get().prepareStatement(query).use { st ->
                 st.setLong(1, sinceMillis)
@@ -309,8 +314,14 @@ class LiteBansHistoryService(
                         val staffName = safeGetString(rs, "banned_by_name") ?: continue
                         if (staffName.isBlank()) continue
                         val staffUuid = safeGetString(rs, "banned_by_uuid")
+                        val key = if (!staffUuid.isNullOrBlank()) staffUuid.lowercase() else staffName.lowercase()
                         val count = rs.getInt("cnt")
-                        val entry = map.computeIfAbsent(staffName) { StaffTopEntry(it) }
+                        val maxTime = safeGetTimeMillis(rs, "max_time")
+                        val entry = map.computeIfAbsent(key) { StaffTopEntry(staffName) }
+                        if (maxTime >= entry.latestTimeMillis) {
+                            entry.latestTimeMillis = maxTime
+                            entry.staffName = staffName
+                        }
                         if (entry.staffUuid == null && !staffUuid.isNullOrBlank()) {
                             entry.staffUuid = staffUuid
                         }

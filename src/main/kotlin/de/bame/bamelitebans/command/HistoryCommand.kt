@@ -37,7 +37,9 @@ class HistoryCommand(
                 if (actualReason.isNullOrBlank()) {
                     de.bame.bamelitebans.util.CommandUtil.replyError(actor, configService.playerNotFound)
                 } else {
-                    de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Keine Einträge mit Grund '<yellow>$actualReason<white>' für <#92F254>$playerName <white>gefunden.")
+                    val safeReason = ColorParser.escape(actualReason)
+                    val safePlayer = ColorParser.escape(playerName)
+                    de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Keine Einträge mit Grund '<yellow>$safeReason<white>' für <#92F254>$safePlayer <white>gefunden.")
                 }
                 return@thenAccept
             }

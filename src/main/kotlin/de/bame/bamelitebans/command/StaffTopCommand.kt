@@ -22,14 +22,20 @@ class StaffTopCommand(
     private val luckPermsService: LuckPermsService = LuckPermsService()
 ) {
 
+    private fun hasPerm(actor: VelocityCommandActor, specificPerm: String): Boolean {
+        val src = actor.source()
+        return src.hasPermission(specificPerm) || src.hasPermission("bamelitebans.command.stafftop")
+    }
+
     @Command("stafftop")
     fun onStaffTop(
         actor: VelocityCommandActor,
         @Optional @SuggestWith(StaffTopPeriodSuggestionProvider::class) period: String?
     ) {
-        if (period?.lowercase() == "own") {
-            if (!actor.source().hasPermission("bamelitebans.command.stafftop.own") &&
-                !actor.source().hasPermission("bamelitebans.command.stafftop")) {
+        val normalized = period?.lowercase()
+
+        if (normalized == "own") {
+            if (!hasPerm(actor, "bamelitebans.command.stafftop.own")) {
                 de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Dazu hast du keine Berechtigung.")
                 return
             }
@@ -37,28 +43,25 @@ class StaffTopCommand(
             return
         }
 
-        if (!actor.source().hasPermission("bamelitebans.command.stafftop")) {
-            if (actor.source().hasPermission("bamelitebans.command.stafftop.own")) {
-                if (period == null) {
-                    handleOwn(actor)
-                } else {
-                    de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Du hast nur die Berechtigung für <yellow>/stafftop own<white>.")
-                }
+        val (periodSmallCaps, sinceMillis, requiredPerm) = when (normalized) {
+            "day", "today", "heute", "tag", "1d" -> Triple("ᴛᴏᴅᴀʏ", LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(), "bamelitebans.command.stafftop.day")
+            "monat", "month", "30d" -> Triple("ʟᴀsᴛ ᴍᴏɴᴛʜ", System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000, "bamelitebans.command.stafftop.month")
+            "all", "gesamt", "alltime" -> Triple("ᴀʟʟ ᴛɪᴍᴇ", 0L, "bamelitebans.command.stafftop.all")
+            null, "week", "woche", "7d" -> Triple("ʟᴀsᴛ ᴡᴇᴇᴋ", System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000, "bamelitebans.command.stafftop.week")
+            else -> {
+                val safePeriod = ColorParser.escape(period)
+                de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Ungültiger Zeitraum '<yellow>$safePeriod<white>'. Erlaubt: <yellow>tag, woche, monat, all, own<white>.")
+                return
+            }
+        }
+
+        if (!hasPerm(actor, requiredPerm)) {
+            if (normalized == null && hasPerm(actor, "bamelitebans.command.stafftop.own")) {
+                handleOwn(actor)
                 return
             }
             de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Dazu hast du keine Berechtigung.")
             return
-        }
-
-        val (periodSmallCaps, sinceMillis) = when (period?.lowercase()) {
-            "day", "today", "heute", "tag", "1d" -> "ᴛᴏᴅᴀʏ" to LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            "monat", "month", "30d" -> "ʟᴀsᴛ ᴍᴏɴᴛʜ" to (System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000)
-            "all", "gesamt", "alltime" -> "ᴀʟʟ ᴛɪᴍᴇ" to 0L
-            null, "week", "woche", "7d" -> "ʟᴀsᴛ ᴡᴇᴇᴋ" to (System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000)
-            else -> {
-                de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Ungültiger Zeitraum '<yellow>$period<white>'. Erlaubt: <yellow>tag, woche, monat, all<white>.")
-                return
-            }
         }
 
         historyService.fetchStaffTop(sinceMillis).thenAccept { entries ->
@@ -71,10 +74,11 @@ class StaffTopCommand(
             actor.reply(ColorParser.parse(configService.stafftopHeader(periodSmallCaps)))
             actor.reply(ColorParser.parse(""))
 
-            entries.forEachIndexed { index, entry ->
+            entries.take(10).forEachIndexed { index, entry ->
                 val rawPrefix = entry.luckPermsPrefix.ifEmpty { "<green>" }
                 val prefix = de.bame.bamelitebans.util.SmallCaps.convertPreservingTags(rawPrefix)
-                val lineText = "<green>#${index + 1}<white>: $prefix<!bold><!italic>${entry.staffName}<reset><white>: <red>${entry.bans} Bans <gray>| <yellow>${entry.mutes} Mutes <gray>| <green>${entry.warns} Warns"
+                val safeName = ColorParser.escape(entry.staffName)
+                val lineText = "<green>#${index + 1}<white>: $prefix<!bold><!italic>$safeName<reset><white>: <red>${entry.bans} Bans <gray>| <yellow>${entry.mutes} Mutes <gray>| <green>${entry.warns} Warns <gray>| <#50BEBE>${entry.kicks} Kicks"
                 actor.reply(ColorParser.parse(lineText))
             }
 
@@ -92,6 +96,7 @@ class StaffTopCommand(
             val bans: Int
             val mutes: Int
             val warns: Int
+            val kicks: Int
 
             if (index != -1) {
                 val entry = entries[index]
@@ -101,6 +106,7 @@ class StaffTopCommand(
                 bans = entry.bans
                 mutes = entry.mutes
                 warns = entry.warns
+                kicks = entry.kicks
             } else {
                 rank = entries.size + 1
                 prefix = try {
@@ -112,12 +118,14 @@ class StaffTopCommand(
                 bans = 0
                 mutes = 0
                 warns = 0
+                kicks = 0
             }
 
             actor.reply(ColorParser.parse(""))
             actor.reply(ColorParser.parse(configService.stafftopHeader("ᴏᴡɴ")))
             actor.reply(ColorParser.parse(""))
-            val lineText = "<green>#$rank<white>: $prefix<!bold><!italic>$name<reset><white>: <red>$bans Bans <gray>| <yellow>$mutes Mutes <gray>| <green>$warns Warns"
+            val safeName = ColorParser.escape(name)
+            val lineText = "<green>#$rank<white>: $prefix<!bold><!italic>$safeName<reset><white>: <red>$bans Bans <gray>| <yellow>$mutes Mutes <gray>| <green>$warns Warns <gray>| <#50BEBE>$kicks Kicks"
             actor.reply(ColorParser.parse(lineText))
             actor.reply(ColorParser.parse(""))
         }

@@ -48,7 +48,8 @@ class LastSeenCommand(
 
             val rawPrefix = luckPermsService.getPrefix(entry.uuid).ifEmpty { "<green>" }
             val prefix = SmallCaps.convertPreservingTags(rawPrefix)
-            val prefixName = "$prefix<!bold><!italic>${entry.name}"
+            val safeName = ColorParser.escape(entry.name)
+            val prefixName = "$prefix<!bold><!italic>$safeName"
 
             val instant = Instant.ofEpochMilli(entry.timestampMillis)
             val dateStr = DATE_FORMATTER.format(instant)
@@ -57,8 +58,9 @@ class LastSeenCommand(
             val warZuletztAm = SmallCaps.convert("war zuletzt am")
             val um = SmallCaps.convert("um")
             val auf = SmallCaps.convert("auf")
-            val serverStr = SmallCaps.convert(entry.server)
-            val onlineStr = SmallCaps.convert("online")
+            val safeServer = ColorParser.escape(entry.server)
+            val serverStr = SmallCaps.convert(safeServer)
+            val onlineStr = if (entry.isOnline) "<green>${SmallCaps.convert("online")}" else "<red>${SmallCaps.convert("offline")}"
 
             val formattedMessage = configService.lastSeenFormat(
                 prefixName, warZuletztAm, dateStr, um, timeStr, auf, serverStr, onlineStr

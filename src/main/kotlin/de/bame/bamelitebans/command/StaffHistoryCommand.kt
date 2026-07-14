@@ -34,10 +34,12 @@ class StaffHistoryCommand(
         val keywords = configService.getSearchKeywords(actualReason)
         historyService.fetchStaffHistory(staffName, keywords).thenAccept { entries ->
             if (entries.isEmpty()) {
+                val safeStaff = ColorParser.escape(staffName)
                 if (actualReason.isNullOrBlank()) {
-                    de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Keine Strafen von <#92F254>$staffName <white>gefunden.")
+                    de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Keine Strafen von <#92F254>$safeStaff <white>gefunden.")
                 } else {
-                    de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Keine Strafen von <#92F254>$staffName <white>mit Grund '<yellow>$actualReason<white>' gefunden.")
+                    val safeReason = ColorParser.escape(actualReason)
+                    de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Keine Strafen von <#92F254>$safeStaff <white>mit Grund '<yellow>$safeReason<white>' gefunden.")
                 }
                 return@thenAccept
             }

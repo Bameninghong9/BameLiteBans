@@ -90,7 +90,8 @@ class LastSeenService(
                     uuid = p.uniqueId.toString(),
                     name = p.username,
                     timestampMillis = System.currentTimeMillis(),
-                    server = serverName
+                    server = serverName,
+                    isOnline = true
                 )
             }
 

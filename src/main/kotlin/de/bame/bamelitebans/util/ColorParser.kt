@@ -36,6 +36,11 @@ object ColorParser {
         'r' to "<reset>"
     )
 
+    fun escape(input: String?): String {
+        if (input == null) return ""
+        return MiniMessage.miniMessage().escapeTags(input)
+    }
+
     fun parse(text: String): Component {
         // 1. Konvertiere &#RRGGBB oder §#RRGGBB in MiniMessage <#RRGGBB>
         var converted = HEX_PATTERN.replace(text) { match ->

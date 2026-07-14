@@ -7,16 +7,39 @@ import revxrsal.commands.velocity.actor.VelocityCommandActor
 class StaffTopPeriodSuggestionProvider : SuggestionProvider<VelocityCommandActor> {
     override fun getSuggestions(context: ExecutionContext<VelocityCommandActor>): Collection<String> {
         val actor = context.actor()
-        val hasGeneral = actor.source().hasPermission("bamelitebans.command.stafftop")
-        val hasOwn = actor.source().hasPermission("bamelitebans.command.stafftop.own")
+        val src = actor.source()
+        val hasGeneral = src.hasPermission("bamelitebans.command.stafftop")
 
         val suggestions = mutableListOf<String>()
-        if (hasGeneral) {
-            suggestions.addAll(listOf("day", "week", "month", "all"))
+        if (hasGeneral || src.hasPermission("bamelitebans.command.stafftop.day")) {
+            suggestions.add("day")
         }
-        if (hasGeneral || hasOwn) {
+        if (hasGeneral || src.hasPermission("bamelitebans.command.stafftop.week")) {
+            suggestions.add("week")
+        }
+        if (hasGeneral || src.hasPermission("bamelitebans.command.stafftop.month")) {
+            suggestions.add("month")
+        }
+        if (hasGeneral || src.hasPermission("bamelitebans.command.stafftop.all")) {
+            suggestions.add("all")
+        }
+        if (hasGeneral || src.hasPermission("bamelitebans.command.stafftop.own")) {
             suggestions.add("own")
         }
-        return suggestions
+
+        val source = try {
+            context.input().source()
+        } catch (_: Exception) {
+            ""
+        }
+        val prefix = if (source.isEmpty() || source.endsWith(" ")) {
+            ""
+        } else {
+            source.substringAfterLast(' ')
+        }
+        if (prefix.isEmpty()) {
+            return suggestions
+        }
+        return suggestions.filter { it.startsWith(prefix, ignoreCase = true) }
     }
 }

@@ -277,64 +277,84 @@ class LiteBansHistoryService(
         pageSize: Int
     ): CompletableFuture<Triple<List<PunishmentEntry>, Int, Int>> {
         return CompletableFuture.supplyAsync({
-            val allMatches = mutableListOf<PunishmentEntry>()
-            val query = if (keywords.isNotEmpty()) {
-                val conditions = keywords.joinToString(" OR ") { "LOWER(reason) LIKE ?" }
-                "SELECT * FROM {bans} WHERE ($conditions) ORDER BY time DESC"
-            } else {
-                "SELECT * FROM {bans} ORDER BY time DESC"
-            }
+            var totalCount = 0
+            val conditions = if (keywords.isNotEmpty()) keywords.joinToString(" OR ") { "LOWER(reason) LIKE ?" } else null
+            val countQuery = if (conditions != null) "SELECT COUNT(*) AS cnt FROM {bans} WHERE ($conditions)" else "SELECT COUNT(*) AS cnt FROM {bans}"
 
             try {
-                Database.get().prepareStatement(query).use { st ->
-                    if (keywords.isNotEmpty()) {
+                Database.get().prepareStatement(countQuery).use { st ->
+                    if (conditions != null) {
                         keywords.forEachIndexed { i, kw ->
                             st.setString(i + 1, "%${kw.lowercase()}%")
                         }
                     }
-                    st.executeQuery().use { rs: ResultSet ->
-                        while (rs.next()) {
-                            val id = rs.getLong("id")
-                            val targetUuid = safeGetString(rs, "uuid") ?: "unbekannt"
-                            val staffName = safeGetString(rs, "banned_by_name") ?: "Konsole"
-                            val rawReason = safeGetString(rs, "reason") ?: "Kein Grund angegeben"
-                            val time = safeGetTimeMillis(rs, "time")
-                            val until = safeGetTimeMillis(rs, "until")
-                            val active = try { rs.getBoolean("active") } catch (e: Exception) { false }
-                            val removedByName = safeGetString(rs, "removed_by_name")
-                            val removedByDateMillis = safeGetLong(rs, "removed_by_date")
-                            val removedByReason = safeGetString(rs, "removed_by_reason")
-
-                            allMatches.add(
-                                PunishmentEntry(
-                                    id = id,
-                                    type = PunishmentType.BAN,
-                                    targetName = targetUuid,
-                                    staffName = staffName,
-                                    reason = rawReason,
-                                    timestampMillis = time,
-                                    untilMillis = until,
-                                    active = active,
-                                    removedByName = removedByName,
-                                    removedByDateMillis = removedByDateMillis,
-                                    removedByReason = removedByReason
-                                )
-                            )
+                    st.executeQuery().use { rs ->
+                        if (rs.next()) {
+                            totalCount = rs.getInt("cnt")
                         }
                     }
                 }
             } catch (e: SQLException) {
-                logger.error("Fehler bei DB-Query in fetchGlobalBans", e)
+                logger.error("Fehler bei DB-Count in fetchGlobalBans", e)
             }
 
-            allMatches.sortWith(compareByDescending<PunishmentEntry> { it.timestampMillis }.thenByDescending { it.id })
-
-            val totalCount = allMatches.size
             val totalPages = if (totalCount == 0) 1 else ((totalCount - 1) / pageSize) + 1
             val validPage = page.coerceIn(1, totalPages)
-            val fromIndex = (validPage - 1) * pageSize
-            val toIndex = (fromIndex + pageSize).coerceAtMost(totalCount)
-            val pageEntries = if (totalCount > 0) allMatches.subList(fromIndex, toIndex) else emptyList()
+            val offset = (validPage - 1) * pageSize
+
+            val pageEntries = mutableListOf<PunishmentEntry>()
+            if (totalCount > 0) {
+                val selectQuery = if (conditions != null) {
+                    "SELECT * FROM {bans} WHERE ($conditions) ORDER BY time DESC, id DESC LIMIT ? OFFSET ?"
+                } else {
+                    "SELECT * FROM {bans} ORDER BY time DESC, id DESC LIMIT ? OFFSET ?"
+                }
+                try {
+                    Database.get().prepareStatement(selectQuery).use { st ->
+                        var paramIndex = 1
+                        if (conditions != null) {
+                            keywords.forEach { kw ->
+                                st.setString(paramIndex++, "%${kw.lowercase()}%")
+                            }
+                        }
+                        st.setInt(paramIndex++, pageSize)
+                        st.setInt(paramIndex, offset)
+
+                        st.executeQuery().use { rs: ResultSet ->
+                            while (rs.next()) {
+                                val id = rs.getLong("id")
+                                val targetUuid = safeGetString(rs, "uuid") ?: "unbekannt"
+                                val staffName = safeGetString(rs, "banned_by_name") ?: "Konsole"
+                                val rawReason = safeGetString(rs, "reason") ?: "Kein Grund angegeben"
+                                val time = safeGetTimeMillis(rs, "time")
+                                val until = safeGetTimeMillis(rs, "until")
+                                val active = try { rs.getBoolean("active") } catch (e: Exception) { false }
+                                val removedByName = safeGetString(rs, "removed_by_name")
+                                val removedByDateMillis = safeGetLong(rs, "removed_by_date")
+                                val removedByReason = safeGetString(rs, "removed_by_reason")
+
+                                pageEntries.add(
+                                    PunishmentEntry(
+                                        id = id,
+                                        type = PunishmentType.BAN,
+                                        targetName = targetUuid,
+                                        staffName = staffName,
+                                        reason = rawReason,
+                                        timestampMillis = time,
+                                        untilMillis = until,
+                                        active = active,
+                                        removedByName = removedByName,
+                                        removedByDateMillis = removedByDateMillis,
+                                        removedByReason = removedByReason
+                                    )
+                                )
+                            }
+                        }
+                    }
+                } catch (e: SQLException) {
+                    logger.error("Fehler bei DB-Select in fetchGlobalBans", e)
+                }
+            }
 
             val nameCache = mutableMapOf<String, String>()
             val resolvedPageEntries = pageEntries.map { entry ->
@@ -363,7 +383,7 @@ class LiteBansHistoryService(
                 .filter { it.total > 0 && !it.staffName.equals("Console", true) && !it.staffName.equals("Konsole", true) }
                 .sortedByDescending { it.total }
 
-            for (entry in topList) {
+            for (entry in topList.take(25)) {
                 val uuidToUse = entry.staffUuid ?: resolvePlayerUuid(entry.staffName)
                 if (!uuidToUse.isNullOrBlank()) {
                     val resolvedLatestName = resolvePlayerName(uuidToUse)

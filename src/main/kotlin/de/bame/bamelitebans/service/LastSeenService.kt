@@ -42,39 +42,52 @@ class LastSeenService(
     fun recordLastSeen(uuid: String, name: String, server: String?) {
         executor.execute {
             val now = System.currentTimeMillis()
-            val updateQuery = if (server != null) {
-                "UPDATE bamelitebans_lastseen SET name=?, last_seen=?, server=? WHERE uuid=?"
-            } else {
-                "UPDATE bamelitebans_lastseen SET name=?, last_seen=? WHERE uuid=?"
-            }
+            val serverName = server ?: "Netzwerk"
+            val query = """
+                INSERT INTO bamelitebans_lastseen (uuid, name, last_seen, server) VALUES (?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE name = VALUES(name), last_seen = VALUES(last_seen), server = VALUES(server)
+            """.trimIndent()
 
             try {
-                val updated = Database.get().prepareStatement(updateQuery).use { st ->
-                    st.setString(1, name)
-                    st.setLong(2, now)
-                    if (server != null) {
-                        st.setString(3, server)
-                        st.setString(4, uuid)
-                    } else {
-                        st.setString(3, uuid)
-                    }
+                Database.get().prepareStatement(query).use { st ->
+                    st.setString(1, uuid)
+                    st.setString(2, name)
+                    st.setLong(3, now)
+                    st.setString(4, serverName)
                     st.executeUpdate()
                 }
-                if (updated == 0) {
-                    val fallbackServer = server ?: "Netzwerk"
-                    val insertQuery = "INSERT INTO bamelitebans_lastseen (uuid, name, last_seen, server) VALUES (?, ?, ?, ?)"
-                    try {
-                        Database.get().prepareStatement(insertQuery).use { st ->
+            } catch (e: SQLException) {
+                // Fallback für SQL-Dialekte ohne ON DUPLICATE KEY UPDATE (z.B. SQLite/PostgreSQL)
+                val fallbackUpdate = if (server != null) {
+                    "UPDATE bamelitebans_lastseen SET name=?, last_seen=?, server=? WHERE uuid=?"
+                } else {
+                    "UPDATE bamelitebans_lastseen SET name=?, last_seen=? WHERE uuid=?"
+                }
+                try {
+                    val updated = Database.get().prepareStatement(fallbackUpdate).use { st ->
+                        st.setString(1, name)
+                        st.setLong(2, now)
+                        if (server != null) {
+                            st.setString(3, server)
+                            st.setString(4, uuid)
+                        } else {
+                            st.setString(3, uuid)
+                        }
+                        st.executeUpdate()
+                    }
+                    if (updated == 0) {
+                        val fallbackInsert = "INSERT INTO bamelitebans_lastseen (uuid, name, last_seen, server) VALUES (?, ?, ?, ?)"
+                        Database.get().prepareStatement(fallbackInsert).use { st ->
                             st.setString(1, uuid)
                             st.setString(2, name)
                             st.setLong(3, now)
-                            st.setString(4, fallbackServer)
+                            st.setString(4, serverName)
                             st.executeUpdate()
                         }
-                    } catch (_: SQLException) {}
+                    }
+                } catch (fallbackEx: SQLException) {
+                    logger.error("Fehler beim atomaren und Fallback-Upsert in bamelitebans_lastseen für $name ($uuid)", fallbackEx)
                 }
-            } catch (e: SQLException) {
-                logger.error("Fehler beim Speichern in bamelitebans_lastseen ($name / $server)", e)
             }
         }
     }

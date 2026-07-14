@@ -24,7 +24,7 @@ class SearchBanListCommand(
         actor: VelocityCommandActor,
         @Optional rawInput: String?
     ) {
-        val (actualReason, pageNum) = parseReasonAndPage(rawInput)
+        val (actualReason, pageNum) = CommandUtil.parseReasonAndNumber(rawInput, 1)
         val keywords = configService.getSearchKeywords(actualReason)
 
         historyService.fetchGlobalBans(keywords, pageNum, 10).thenAccept { (entries, page, totalPages) ->
@@ -63,23 +63,5 @@ class SearchBanListCommand(
             actor.reply(ColorParser.parse("<white>=== $footerButtons <white>==="))
             actor.reply(ColorParser.parse(""))
         }
-    }
-
-    private fun parseReasonAndPage(rawInput: String?): Pair<String?, Int> {
-        if (rawInput.isNullOrBlank()) return null to 1
-        val trimmed = rawInput.trim()
-        val pureNumber = trimmed.toIntOrNull()
-        if (pureNumber != null && pureNumber > 0) {
-            return null to pureNumber
-        }
-        val lastSpace = trimmed.lastIndexOf(' ')
-        if (lastSpace != -1) {
-            val possibleNumber = trimmed.substring(lastSpace + 1).toIntOrNull()
-            if (possibleNumber != null && possibleNumber > 0) {
-                val actualReason = trimmed.substring(0, lastSpace).trim()
-                return (if (actualReason.isEmpty()) null else actualReason) to possibleNumber
-            }
-        }
-        return trimmed to 1
     }
 }

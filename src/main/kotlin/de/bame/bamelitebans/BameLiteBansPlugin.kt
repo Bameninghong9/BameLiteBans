@@ -51,7 +51,17 @@ class BameLiteBansPlugin @Inject constructor(
     @Suppress("UNUSED_PARAMETER")
     fun onProxyInitialization(event: ProxyInitializeEvent) {
         instance = this
-        logger.info("BameLiteBans wird initialisiert...")
+        logger.info("""
+            
+             ____                   _      _ _       ____                   
+            |  _ \                 | |    (_) |     |  _ \                  
+            | |_) | __ _ _ __ ___  | |     _| |_ ___| |_) | __ _ _ __ ___   
+            |  _ < / _` | '_ ` _ \ | |    | | __/ _ \  _ < / _` | '_ ` _ \  
+            | |_) | (_| | | | | | || |____| | ||  __/ |_) | (_| | | | | | | 
+            |____/ \__,_|_| |_| |_||______|_|\__\___|____/ \__,_|_| |_| |_| 
+             v1.0.0 by Bame | High-Performance LiteBans Moderation Suite
+        """.trimIndent())
+        logger.info("⚡ [BameLiteBans] Initialisiere Datenbank-Pool (4 Threads) & Tabellen-Sync...")
 
         configService = ConfigService(dataDirectory)
         historyService = LiteBansHistoryService(logger, luckPermsService = luckPermsService, executor = dbExecutor)
@@ -61,6 +71,7 @@ class BameLiteBansPlugin @Inject constructor(
 
         val lamp = VelocityLamp.builder(this, proxy).build()
 
+        logger.info("✔ [BameLiteBans] Registriere Commands über Lamp Framework...")
         lamp.register(HistoryCommand(historyService, configService))
         lamp.register(StaffHistoryCommand(historyService, configService))
         lamp.register(StaffTopCommand(historyService, configService))
@@ -70,22 +81,37 @@ class BameLiteBansPlugin @Inject constructor(
 
         lamp.accept(VelocityVisitors.brigadier(proxy))
 
-        logger.info("BameLiteBans erfolgreich initialisiert! Befehle /searchhistory, /searchstaffhistory, /searchbanlist, /stafftop, /lastseen und /bamelitebans reload sind einsatzbereit.")
+        logger.info("✔ [Commands] ➜ /searchhistory (<spieler> [grund/seite])")
+        logger.info("✔ [Commands] ➜ /searchstaffhistory (<staff> [grund/seite])")
+        logger.info("✔ [Commands] ➜ /searchbanlist (<grund> [seite])")
+        logger.info("✔ [Commands] ➜ /stafftop ([day/week/month/all/own])")
+        logger.info("✔ [Commands] ➜ /lastseen (<spieler>)")
+        logger.info("✔ [Commands] ➜ /bamelitebans reload")
+        logger.info("🚀 [BameLiteBans] Plugin erfolgreich geladen und einsatzbereit!")
     }
 
     @Subscribe
     fun onServerConnected(event: ServerConnectedEvent) {
         val player = event.player
         val serverName = event.server.serverInfo.name
+        logger.info("🌐 [LastSeen] ${player.username} betritt Server [$serverName]. Aktualisiere Zeitstempel...")
         lastSeenService.recordLastSeen(player.uniqueId.toString(), player.username, serverName)
     }
 
     @Subscribe
     fun onDisconnect(event: DisconnectEvent) {
         val player = event.player
-        val serverName = player.currentServer.map { it.serverInfo.name }.orElse(null)
-        if (serverName != null) {
-            lastSeenService.recordLastSeen(player.uniqueId.toString(), player.username, serverName)
-        }
+        val serverName = player.currentServer.map { it.serverInfo.name }.orElse("Netzwerk")
+        logger.info("👤 [LastSeen] ${player.username} verlässt den Proxy (Letzter Server: $serverName). Speichere Status...")
+        lastSeenService.recordLastSeen(player.uniqueId.toString(), player.username, serverName)
+    }
+
+    @Subscribe
+    @Suppress("UNUSED_PARAMETER")
+    fun onProxyShutdown(event: com.velocitypowered.api.event.proxy.ProxyShutdownEvent) {
+        logger.info("🔴 [BameLiteBans] Proxy stoppt. Schließe Datenbank-Threadpool & leere Caches...")
+        luckPermsService.clearCache()
+        dbExecutor.shutdown()
+        logger.info("✔ [BameLiteBans] Shutdown sauber abgeschlossen.")
     }
 }

@@ -13,9 +13,9 @@ object CommandUtil {
         actor.reply(ColorParser.parse(""))
     }
 
-    fun parseReasonAndLimit(rawReason: String?, defaultLimit: Int = 100): Pair<String?, Int> {
-        if (rawReason.isNullOrBlank()) return null to defaultLimit
-        val trimmed = rawReason.trim()
+    fun parseReasonAndNumber(rawInput: String?, defaultNumber: Int = 100): Pair<String?, Int> {
+        if (rawInput.isNullOrBlank()) return null to defaultNumber
+        val trimmed = rawInput.trim()
         val pureNumber = trimmed.toIntOrNull()
         if (pureNumber != null && pureNumber > 0) {
             return null to pureNumber
@@ -28,6 +28,10 @@ object CommandUtil {
                 return (if (actualReason.isEmpty()) null else actualReason) to possibleNumber
             }
         }
-        return trimmed to defaultLimit
+        return trimmed to defaultNumber
+    }
+
+    fun parseReasonAndLimit(rawReason: String?, defaultLimit: Int = 100): Pair<String?, Int> {
+        return parseReasonAndNumber(rawReason, defaultLimit)
     }
 }

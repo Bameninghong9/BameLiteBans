@@ -1,0 +1,16 @@
+{
+  "id": "bamelitebans",
+  "name": "BameLiteBans",
+  "version": "1.0.0",
+  "description": "Erweitertes LiteBans History-Suchplugin für Velocity mit Lamp",
+  "authors": [
+    "Bame"
+  ],
+  "main": "de.bame.bamelitebans.BameLiteBansPlugin",
+  "dependencies": [
+    {
+      "id": "litebans",
+      "optional": false
+    }
+  ]
+}

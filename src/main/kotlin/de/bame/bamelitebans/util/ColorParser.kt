@@ -85,4 +85,18 @@ object ColorParser {
             LegacyComponentSerializer.legacySection().deserialize(processed)
         }
     }
+
+    fun stripColors(text: String?): String {
+        if (text.isNullOrBlank()) return ""
+        var clean = try {
+            MiniMessage.miniMessage().stripTags(text)
+        } catch (_: Exception) {
+            text
+        }
+        clean = clean.replace(Regex("[&§]x([&§][0-9a-fA-F]){6}"), "")
+        clean = clean.replace(Regex("[&§]#[0-9a-fA-F]{6}"), "")
+        clean = clean.replace(Regex("<[^>]+>"), "")
+        clean = clean.replace(Regex("[&§][0-9a-fk-orA-FK-OR]"), "")
+        return clean.trim()
+    }
 }

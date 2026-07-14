@@ -8,6 +8,7 @@ import java.nio.file.Path
 class ConfigService(private val dataDirectory: Path) {
 
     private var toml: Toml = Toml()
+    private var webhookToml: Toml = Toml()
 
     init {
         loadConfig()
@@ -22,62 +23,123 @@ class ConfigService(private val dataDirectory: Path) {
         if (!configFile.exists()) {
             writeDefaultConfig(configFile)
         }
-
         toml = Toml().read(configFile)
+
+        val webhookFile = dataDirectory.resolve("webhook.toml").toFile()
+        if (!webhookFile.exists()) {
+            writeDefaultWebhookConfig(webhookFile)
+        }
+        webhookToml = Toml().read(webhookFile)
     }
 
     private fun writeDefaultConfig(file: File) {
         val defaultContent = """
             # =========================================================
-            #  BameLiteBans Konfiguration
-            #  Erweiterte Such- & Staff-Historie für LiteBans
+            #             BAME LITEBANS - HAUPTKONFIGURATION
+            #   High-Performance Moderation & History Suite für Velocity
             # =========================================================
 
+            # ---------------------------------------------------------
+            # [messages] - Alle Chat-Ausgaben und Nachrichten
+            # Unterstützt MiniMessage (<gold>, <#FFB700>, <b>) & Legacy Hex
+            # ---------------------------------------------------------
             [messages]
-            # Header bei Spielersuche mit Suchbegriff (z.B. /searchhistory John6Pork7 hacks)
-            header_search = "<#FFB700>History for <#92F254>{player} <#FFB700>({reason} '<yellow>{count}<#FFB700>'):"
 
-            # Header bei Spielersuche ohne Suchbegriff (z.B. /searchhistory John6Pork7)
+            # --- /searchhistory (Spieler-Verlauf) ---
+            # Header bei Suche MIT spezifischem Grund (z.B. /searchhistory Spieler hacks)
+            header_search = "<#FFB700>History for <#92F254>{player} <#FFB700>({reason} '<yellow>{count}<#FFB700>'):"
+            # Header bei Suche OHNE spezifischen Grund (z.B. /searchhistory Spieler)
             header_all = "<#FFB700>History for <#92F254>{player} <#FFB700>('<yellow>{count}<#FFB700>'):"
 
-            # Header bei Staff-Suche mit Suchbegriff (z.B. /searchstaffhistory Bameninghong9 hacks)
+            # --- /searchstaffhistory (Staff-Verlauf) ---
+            # Header bei Staff-Suche MIT spezifischem Grund
             staff_header_search = "<#FFB700>Staff-History for <#92F254>{staff} <#FFB700>({reason} '<yellow>{count}<#FFB700>'):"
-
-            # Header bei Staff-Suche ohne Suchbegriff (z.B. /searchstaffhistory Bameninghong9)
+            # Header bei Staff-Suche OHNE spezifischen Grund
             staff_header_all = "<#FFB700>Staff-History for <#92F254>{staff} <#FFB700>('<yellow>{count}<#FFB700>'):"
 
-            # Fehlermeldung wenn Spieler/Staff nicht gefunden wurde
-            player_not_found = "<red>sᴘɪᴇʟᴇʀ ɴɪᴄʜᴛ ɢᴇꜰᴜɴᴅᴇɴ."
-
-            # Header für /stafftop Leaderboard
+            # --- /stafftop (Leaderboard) ---
+            # Header des Staff-Leaderboards
             stafftop_header = "<gold>🏆 <green>Staff-Leaderboard ({period}):"
-
-            # Header und Format für /lastseen <spieler> (MiniMessage & Legacy Hex unterstützt)
-            lastseen_header = "<white>⌚ <b><gradient:#FFFE00:#F9F869>ʟᴀsᴛ sᴇᴇɴ"
-            lastseen_format = "{prefix_name}<reset> <gray>{war_zuletzt_am} <#FFFE00>{date} <gray>{um} <#FFFE00>{time} <gray>{auf} <#FFFE00>{server} <gray>{online}"
-
-            # Header für /searchbanlist
-            searchbanlist_header = "<white>=== <green>ᴘᴀɢᴇ <gold>{page} <green>ᴏᴜᴛ ᴏꜰ <gold>{total} <white>==="
-
-            # Meldung wenn im gewählten Zeitraum keine Strafen gefunden wurden
+            # Meldung, wenn im gewählten Zeitraum keine Strafen gefunden wurden
             stafftop_empty = "<red>Keine Moderationsaktivität im Zeitraum <yellow>{period} <red>gefunden."
 
-            # Nachricht nach erfolgreichem Reload (/bamelitebans reload)
-            reload_success = "<green>[BameLiteBans] config.toml erfolgreich neu geladen!"
+            # --- /lastseen (Online-/Offline-Status & Letzter Server) ---
+            # Header über der LastSeen-Ausgabe
+            lastseen_header = "<white>⌚ <b><gradient:#FFFE00:#F9F869>ʟᴀsᴛ sᴇᴇɴ"
+            # Formatzeile für die Ausgabe (Platzhalter: {prefix_name}, {war_zuletzt_am}, {date}, {um}, {time}, {auf}, {server}, {online})
+            lastseen_format = "{prefix_name}<reset> <gray>{war_zuletzt_am} <#FFFE00>{date} <gray>{um} <#FFFE00>{time} <gray>{auf} <#FFFE00>{server} <gray>{online}"
 
+            # --- /searchbanlist (Paginierte Bannliste nach Grund) ---
+            # Header der seitenbasierten Bannliste
+            searchbanlist_header = "<white>=== <green>ᴘᴀɢᴇ <gold>{page} <green>ᴏᴜᴛ ᴏꜰ <gold>{total} <white>==="
+
+            # --- Allgemeine System-Nachrichten ---
+            # Fehlermeldung, wenn ein Spieler oder Teammitglied in der Datenbank nicht existiert
+            player_not_found = "<red>sᴘɪᴇʟᴇʀ ɴɪᴄʜᴛ ɢᴇꜰᴜɴᴅᴇɴ."
+            # Reload-Header und Nachricht (/bamelitebans reload)
+            reload_header = "<white>🗘 <b><gradient:#F92727:#FFFFFF>ʀᴇʟᴏᴀᴅ"
+            reload_success = "<white>config und webhook.toml wurden reloaded"
+
+
+            # ---------------------------------------------------------
+            # [punishment] - Strafanzeigen & Synonym-Gruppen
+            # ---------------------------------------------------------
             [punishment]
-            # Tag für aktive Strafen
-            active_tag = "<white> [<red>ᴀᴋᴛɪᴠ<white>]"
 
-            # Tag für abgelaufene Strafen
+            # Tag hinter einer aktiven Strafe in der Historie
+            active_tag = "<white> [<red>ᴀᴋᴛɪᴠ<white>]"
+            # Tag hinter einer abgelaufenen oder aufgehobenen Strafe
             expired_tag = "<white> [<#828FE7>ᴀʙɢᴇʟᴀᴜꜰᴇɴ<white>]"
 
             # Suchgruppen / Synonyme für /searchhistory & /searchstaffhistory:
-            # Sucht man nach einem Begriff einer Gruppe (z.B. "Cheats" oder "Hacks"),
-            # werden automatisch alle Gründe angezeigt, die irgendeinen Begriff aus dieser Gruppe enthalten.
+            # Wenn ein Moderator nach einem Begriff aus einer Gruppe sucht (z.B. "Cheats"),
+            # durchsucht das Plugin die Datenbank automatisch nach allen Begriffen dieser Gruppe.
             search_groups = [
                 ["hacks", "cheats", "unerlaubte clientmodifikation", "clientmodifikation"]
             ]
+        """.trimIndent()
+
+        file.writeText(defaultContent, Charsets.UTF_8)
+    }
+
+    private fun writeDefaultWebhookConfig(file: File) {
+        val defaultContent = """
+            # =========================================================
+            #          BAME LITEBANS - DISCORD WEBHOOK CONFIG
+            #   Automatische Benachrichtigungen bei Strafen & Entbannungen
+            # =========================================================
+
+            [webhook]
+            # Discord Webhook aktivieren / deaktivieren
+            enabled = true
+            url = "DEINE_WEBHOOK_URL"
+
+            # Welche Strafen & Entbannungen sollen als Webhook gesendet werden?
+            send_bans = true
+            send_mutes = true
+            send_warns = false
+            send_kicks = true
+            send_unbans = true
+            send_unmutes = true
+            send_unwarns = false
+
+            # Titel für Discord Embeds
+            title_ban = "🔨 Spieler banned"
+            title_mute = "🔇 Spieler muted"
+            title_warn = "⚠ Spieler warned"
+            title_kick = "👢 Spieler kicked"
+            title_unban = "✔ Spieler unbanned"
+            title_unmute = "🔊 Spieler unmuted"
+            title_unwarn = "🗑 Verwarnung unwarned"
+
+            # Farben in Hex/Dezimal
+            color_ban = 16711680      # Rot
+            color_mute = 8421504      # Grau
+            color_warn = 16776960     # Gelb
+            color_kick = 16753920     # Orange
+            color_unban = 65280       # Grün
+            color_unmute = 49151      # Hellblau
+            color_unwarn = 2142890    # Türkis
         """.trimIndent()
 
         file.writeText(defaultContent, Charsets.UTF_8)
@@ -116,8 +178,11 @@ class ConfigService(private val dataDirectory: Path) {
     val playerNotFound: String
         get() = toml.getString("messages.player_not_found") ?: "<red>sᴘɪᴇʟᴇʀ ɴɪᴄʜᴛ ɢᴇꜰᴜɴᴅᴇɴ."
 
+    val reloadHeader: String
+        get() = toml.getString("messages.reload_header") ?: "<white>🗘 <b><gradient:#F92727:#FFFFFF>ʀᴇʟᴏᴀᴅ"
+
     val reloadSuccess: String
-        get() = toml.getString("messages.reload_success") ?: "<green>[BameLiteBans] config.toml erfolgreich neu geladen!"
+        get() = toml.getString("messages.reload_success") ?: "<white>config und webhook.toml wurden reloaded"
 
     val activeTag: String
         get() = toml.getString("punishment.active_tag") ?: "<white> [<red>ᴀᴋᴛɪᴠ<white>]"
@@ -193,5 +258,76 @@ class ConfigService(private val dataDirectory: Path) {
             .replace("{page}", page.toString())
             .replace("{total}", total.toString())
     }
-}
 
+    val isWebhookEnabled: Boolean
+        get() = webhookToml.getBoolean("webhook.enabled") ?: webhookToml.getBoolean("enabled") ?: toml.getBoolean("webhook.enabled", false)
+
+    val webhookUrl: String
+        get() = webhookToml.getString("webhook.url") ?: webhookToml.getString("url") ?: toml.getString("webhook.url") ?: ""
+
+    fun isWebhookTypeEnabled(type: String, removed: Boolean): Boolean {
+        val key = when {
+            removed && type == "ban" -> "send_unbans"
+            removed && type == "mute" -> "send_unmutes"
+            removed && type == "warn" -> "send_unwarns"
+            type == "ban" -> "send_bans"
+            type == "mute" -> "send_mutes"
+            type == "warn" -> "send_warns"
+            type == "kick" -> "send_kicks"
+            else -> return false
+        }
+        return webhookToml.getBoolean("webhook.$key") ?: webhookToml.getBoolean(key) ?: toml.getBoolean("webhook.$key") ?: toml.getBoolean(key, true)
+    }
+
+    fun getWebhookTitle(type: String, removed: Boolean): String {
+        val key = when {
+            removed && type == "ban" -> "title_unban"
+            removed && type == "mute" -> "title_unmute"
+            removed && type == "warn" -> "title_unwarn"
+            type == "ban" -> "title_ban"
+            type == "mute" -> "title_mute"
+            type == "warn" -> "title_warn"
+            type == "kick" -> "title_kick"
+            else -> "title_ban"
+        }
+        val defaultTitle = when (key) {
+            "title_unban" -> "✔ Spieler unbanned"
+            "title_unmute" -> "🔊 Spieler unmuted"
+            "title_unwarn" -> "🗑 Verwarnung unwarned"
+            "title_ban" -> "🔨 Spieler banned"
+            "title_mute" -> "🔇 Spieler muted"
+            "title_warn" -> "⚠ Spieler warned"
+            "title_kick" -> "👢 Spieler kicked"
+            else -> "🔨 Strafe"
+        }
+        return webhookToml.getString("webhook.$key") ?: webhookToml.getString(key) ?: toml.getString("webhook.$key", defaultTitle)
+    }
+
+    fun getWebhookColor(type: String, removed: Boolean): Int {
+        val key = when {
+            removed && type == "ban" -> "color_unban"
+            removed && type == "mute" -> "color_unmute"
+            removed && type == "warn" -> "color_unwarn"
+            type == "ban" -> "color_ban"
+            type == "mute" -> "color_mute"
+            type == "warn" -> "color_warn"
+            type == "kick" -> "color_kick"
+            else -> "color_ban"
+        }
+        val defaultColor = when (key) {
+            "color_unban" -> 65280
+            "color_unmute" -> 49151
+            "color_unwarn" -> 2142890
+            "color_ban" -> 16711680
+            "color_mute" -> 8421504
+            "color_warn" -> 16776960
+            "color_kick" -> 16753920
+            else -> 16711680
+        }
+        return try {
+            (webhookToml.getLong("webhook.$key") ?: webhookToml.getLong(key) ?: toml.getLong("webhook.$key"))?.toInt() ?: defaultColor
+        } catch (_: Exception) {
+            defaultColor
+        }
+    }
+}

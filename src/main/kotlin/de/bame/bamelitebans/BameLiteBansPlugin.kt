@@ -37,10 +37,21 @@ class BameLiteBansPlugin @Inject constructor(
     private lateinit var historyService: LiteBansHistoryService
     private lateinit var configService: ConfigService
     private lateinit var lastSeenService: LastSeenService
+    private lateinit var webhookService: de.bame.bamelitebans.service.DiscordWebhookService
     private val luckPermsService = LuckPermsService()
 
     private val dbExecutor = Executors.newFixedThreadPool(4) { r ->
         Thread(r, "BameLiteBans-DB").apply { isDaemon = true }
+    }
+
+    private val liteBansListener = object : litebans.api.Events.Listener() {
+        override fun entryAdded(entry: litebans.api.Entry) {
+            webhookService.sendPunishment(entry, removed = false)
+        }
+
+        override fun entryRemoved(entry: litebans.api.Entry) {
+            webhookService.sendPunishment(entry, removed = true)
+        }
     }
 
     companion object {
@@ -66,8 +77,20 @@ class BameLiteBansPlugin @Inject constructor(
         configService = ConfigService(dataDirectory)
         historyService = LiteBansHistoryService(logger, luckPermsService = luckPermsService, executor = dbExecutor)
         lastSeenService = LastSeenService(proxy, historyService, logger, dbExecutor)
+        webhookService = de.bame.bamelitebans.service.DiscordWebhookService(configService, logger, luckPermsService)
 
         lastSeenService.initTable()
+
+        try {
+            litebans.api.Events.get().register(liteBansListener)
+            if (configService.isWebhookEnabled) {
+                logger.info("✔ [BameLiteBans] Discord Webhook Service geladen & LiteBans Event-Listener aktiv.")
+            } else {
+                logger.info("✔ [BameLiteBans] LiteBans Event-Listener aktiv (Webhook aktuell in config.toml deaktiviert).")
+            }
+        } catch (e: Exception) {
+            logger.warn("⚠ [BameLiteBans] Konnte LiteBans API Listener nicht registrieren: ${e.message}")
+        }
 
         val lamp = VelocityLamp.builder(this, proxy).build()
 
@@ -94,7 +117,7 @@ class BameLiteBansPlugin @Inject constructor(
     fun onServerConnected(event: ServerConnectedEvent) {
         val player = event.player
         val serverName = event.server.serverInfo.name
-        logger.info("🌐 [LastSeen] ${player.username} betritt Server [$serverName]. Aktualisiere Zeitstempel...")
+        logger.debug("[LastSeen] ${player.username} betritt Server [$serverName]. Aktualisiere Zeitstempel in DB...")
         lastSeenService.recordLastSeen(player.uniqueId.toString(), player.username, serverName)
     }
 
@@ -102,7 +125,7 @@ class BameLiteBansPlugin @Inject constructor(
     fun onDisconnect(event: DisconnectEvent) {
         val player = event.player
         val serverName = player.currentServer.map { it.serverInfo.name }.orElse("Netzwerk")
-        logger.info("👤 [LastSeen] ${player.username} verlässt den Proxy (Letzter Server: $serverName). Speichere Status...")
+        logger.debug("[LastSeen] ${player.username} verlässt den Proxy (Letzter Server: $serverName). Speichere Status in DB...")
         lastSeenService.recordLastSeen(player.uniqueId.toString(), player.username, serverName)
     }
 
@@ -110,7 +133,11 @@ class BameLiteBansPlugin @Inject constructor(
     @Suppress("UNUSED_PARAMETER")
     fun onProxyShutdown(event: com.velocitypowered.api.event.proxy.ProxyShutdownEvent) {
         logger.info("🔴 [BameLiteBans] Proxy stoppt. Schließe Datenbank-Threadpool & leere Caches...")
+        try {
+            litebans.api.Events.get().unregister(liteBansListener)
+        } catch (_: Exception) {}
         luckPermsService.clearCache()
+        webhookService.shutdown()
         dbExecutor.shutdown()
         logger.info("✔ [BameLiteBans] Shutdown sauber abgeschlossen.")
     }

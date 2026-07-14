@@ -17,6 +17,9 @@ class ReloadCommand(
     @CommandPermission("bamelitebans.command.configreload")
     fun onReload(actor: VelocityCommandActor) {
         configService.loadConfig()
+        actor.reply(ColorParser.parse(""))
+        actor.reply(ColorParser.parse(configService.reloadHeader))
         actor.reply(ColorParser.parse(configService.reloadSuccess))
+        actor.reply(ColorParser.parse(""))
     }
 }

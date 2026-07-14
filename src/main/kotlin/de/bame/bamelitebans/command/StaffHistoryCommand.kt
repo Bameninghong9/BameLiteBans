@@ -30,27 +30,53 @@ class StaffHistoryCommand(
             return
         }
 
-        val keywords = configService.getSearchKeywords(reason)
+        val (actualReason, displayLimit) = parseReasonAndLimit(reason, 100)
+        val keywords = configService.getSearchKeywords(actualReason)
         historyService.fetchStaffHistory(staffName, keywords).thenAccept { entries ->
             if (entries.isEmpty()) {
-                if (reason.isNullOrBlank()) {
+                if (actualReason.isNullOrBlank()) {
                     actor.reply(ColorParser.parse("<red>Keine Strafen von <#92F254>$staffName <red>gefunden."))
                 } else {
-                    actor.reply(ColorParser.parse("<red>Keine Strafen von <#92F254>$staffName <red>mit Grund '<yellow>$reason<red>' gefunden."))
+                    actor.reply(ColorParser.parse("<red>Keine Strafen von <#92F254>$staffName <red>mit Grund '<yellow>$actualReason<red>' gefunden."))
                 }
                 return@thenAccept
             }
 
-            val headerText = if (!reason.isNullOrBlank()) {
-                configService.staffHeaderSearch(staffName, reason, entries.size)
+            val headerText = if (!actualReason.isNullOrBlank()) {
+                configService.staffHeaderSearch(staffName, actualReason, entries.size)
             } else {
                 configService.staffHeaderAll(staffName, entries.size)
             }
             actor.reply(ColorParser.parse(headerText))
 
-            for (entry in entries) {
+            val displayEntries = entries.take(displayLimit)
+
+            for (entry in displayEntries) {
                 actor.reply(entry.toChatMessage(configService))
             }
+
+            if (entries.size > displayLimit) {
+                val remaining = entries.size - displayLimit
+                actor.reply(ColorParser.parse("<gray>... und <#FFFE00>$remaining <gray>weitere ältere Einträge ausgeblendet (Limit: $displayLimit). Nutze z.B. <yellow>/searchstaffhist $staffName $actualReason ${entries.size} <gray>um alle anzuzeigen."))
+            }
         }
+    }
+
+    private fun parseReasonAndLimit(rawReason: String?, defaultLimit: Int = 100): Pair<String?, Int> {
+        if (rawReason.isNullOrBlank()) return null to defaultLimit
+        val trimmed = rawReason.trim()
+        val pureNumber = trimmed.toIntOrNull()
+        if (pureNumber != null && pureNumber > 0) {
+            return null to pureNumber
+        }
+        val lastSpace = trimmed.lastIndexOf(' ')
+        if (lastSpace != -1) {
+            val possibleNumber = trimmed.substring(lastSpace + 1).toIntOrNull()
+            if (possibleNumber != null && possibleNumber >= 5) {
+                val actualReason = trimmed.substring(0, lastSpace).trim()
+                return (if (actualReason.isEmpty()) null else actualReason) to possibleNumber
+            }
+        }
+        return trimmed to defaultLimit
     }
 }

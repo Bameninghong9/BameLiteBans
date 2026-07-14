@@ -75,8 +75,10 @@ class LiteBansHistoryService(
                 entries
             }
 
-            // Chronologisch absteigend sortieren (neueste zuerst)
-            filtered.sortedByDescending { it.timestampMillis }
+            // Chronologisch absteigend sortieren und Duplikate ausschließen
+            filtered
+                .distinctBy { "${it.type}_${it.id}" }
+                .sortedWith(compareByDescending<PunishmentEntry> { it.timestampMillis }.thenByDescending { it.id })
         }, executor)
     }
 
@@ -85,6 +87,21 @@ class LiteBansHistoryService(
             rs.getString(col)
         } catch (e: Exception) {
             null
+        }
+    }
+
+    private fun safeGetTimeMillis(rs: ResultSet, col: String): Long {
+        return try {
+            val l = rs.getLong(col)
+            if (l > 0L) l else {
+                rs.getTimestamp(col)?.time ?: 0L
+            }
+        } catch (e: Exception) {
+            try {
+                rs.getTimestamp(col)?.time ?: 0L
+            } catch (e2: Exception) {
+                0L
+            }
         }
     }
 
@@ -119,8 +136,8 @@ class LiteBansHistoryService(
                         val id = rs.getLong("id")
                         val rawReason = safeGetString(rs, "reason") ?: "Kein Grund angegeben"
                         val staffName = safeGetString(rs, "banned_by_name") ?: "Konsole"
-                        val time = try { rs.getLong("time") } catch (e: Exception) { 0L }
-                        val until = try { rs.getLong("until") } catch (e: Exception) { 0L }
+                        val time = safeGetTimeMillis(rs, "time")
+                        val until = safeGetTimeMillis(rs, "until")
                         val active = try { rs.getBoolean("active") } catch (e: Exception) { false }
 
                         val removedByName = safeGetString(rs, "removed_by_name")
@@ -194,7 +211,9 @@ class LiteBansHistoryService(
                 entries
             }
 
-            filtered.sortedByDescending { it.timestampMillis }
+            filtered
+                .distinctBy { "${it.type}_${it.id}" }
+                .sortedWith(compareByDescending<PunishmentEntry> { it.timestampMillis }.thenByDescending { it.id })
         }, executor)
     }
 
@@ -220,11 +239,11 @@ class LiteBansHistoryService(
 
                         val executorName = safeGetString(rs, "banned_by_name") ?: staffName
                         val rawReason = safeGetString(rs, "reason") ?: ""
-                        val time = rs.getLong("time")
-                        val until = rs.getLong("until")
-                        val active = rs.getBoolean("active")
+                        val time = safeGetTimeMillis(rs, "time")
+                        val until = safeGetTimeMillis(rs, "until")
+                        val active = try { rs.getBoolean("active") } catch (e: Exception) { false }
                         val removedByName = safeGetString(rs, "removed_by_name")
-                        val removedByDateMillis = rs.getTimestamp("removed_by_date")?.time
+                        val removedByDateMillis = safeGetLong(rs, "removed_by_date")
                         val removedByReason = safeGetString(rs, "removed_by_reason")
 
                         list.add(

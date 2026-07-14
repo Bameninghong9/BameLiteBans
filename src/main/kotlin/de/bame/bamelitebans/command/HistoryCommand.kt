@@ -63,6 +63,10 @@ class HistoryCommand(
                 val safeReason = ColorParser.escape(actualReason ?: "")
                 actor.reply(ColorParser.parse("<gray>... und <#FFFE00>$remaining <gray>weitere ältere Einträge ausgeblendet (Limit: $displayLimit). Nutze z.B. <yellow>/searchhist $safePlayer $safeReason ${entries.size} <gray>um alle anzuzeigen."))
             }
+        }.exceptionally { e ->
+            org.slf4j.LoggerFactory.getLogger(HistoryCommand::class.java).error("Fehler bei /searchhistory", e)
+            de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Ein Fehler ist aufgetreten.")
+            null
         }
     }
 }

@@ -63,6 +63,10 @@ class StaffHistoryCommand(
                 val safeReason = ColorParser.escape(actualReason ?: "")
                 actor.reply(ColorParser.parse("<gray>... und <#FFFE00>$remaining <gray>weitere ältere Einträge ausgeblendet (Limit: $displayLimit). Nutze z.B. <yellow>/searchstaffhist $safeStaff $safeReason ${entries.size} <gray>um alle anzuzeigen."))
             }
+        }.exceptionally { e ->
+            org.slf4j.LoggerFactory.getLogger(StaffHistoryCommand::class.java).error("Fehler bei /staffhistory", e)
+            de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Ein Fehler ist aufgetreten.")
+            null
         }
     }
 }

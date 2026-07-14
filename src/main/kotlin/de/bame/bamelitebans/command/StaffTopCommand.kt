@@ -83,6 +83,10 @@ class StaffTopCommand(
             }
 
             actor.reply(ColorParser.parse(""))
+        }.exceptionally { e ->
+            org.slf4j.LoggerFactory.getLogger(StaffTopCommand::class.java).error("Fehler bei /stafftop", e)
+            de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Ein Fehler ist aufgetreten.")
+            null
         }
     }
 
@@ -128,6 +132,10 @@ class StaffTopCommand(
             val lineText = "<green>#$rank<white>: $prefix<!bold><!italic>$safeName<reset><white>: <red>$bans Bans <gray>| <yellow>$mutes Mutes <gray>| <green>$warns Warns <gray>| <#50BEBE>$kicks Kicks"
             actor.reply(ColorParser.parse(lineText))
             actor.reply(ColorParser.parse(""))
+        }.exceptionally { e ->
+            org.slf4j.LoggerFactory.getLogger(StaffTopCommand::class.java).error("Fehler bei /stafftop own", e)
+            de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Ein Fehler ist aufgetreten.")
+            null
         }
     }
 }

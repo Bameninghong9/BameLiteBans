@@ -47,8 +47,12 @@ class SearchBanListCommand(
                 actor.reply(entry.toChatMessage(configService))
             }
 
-            val prevCmd = if (actualReason != null) "/searchbanlist $actualReason ${page - 1}" else "/searchbanlist ${page - 1}"
-            val nextCmd = if (actualReason != null) "/searchbanlist $actualReason ${page + 1}" else "/searchbanlist ${page + 1}"
+            val safeReasonCmd = if (actualReason != null) {
+                ColorParser.escape(actualReason).replace("'", "\\'")
+            } else null
+
+            val prevCmd = if (safeReasonCmd != null) "/searchbanlist $safeReasonCmd ${page - 1}" else "/searchbanlist ${page - 1}"
+            val nextCmd = if (safeReasonCmd != null) "/searchbanlist $safeReasonCmd ${page + 1}" else "/searchbanlist ${page + 1}"
 
             val prevText = "<click:run_command:'$prevCmd'><hover:show_text:'<green>Zu Seite ${page - 1}'>← <gold>${SmallCaps.convert("eine seite zurück")}</hover></click>"
             val nextText = "<click:run_command:'$nextCmd'><hover:show_text:'<green>Zu Seite ${page + 1}'>${SmallCaps.convert("nächste seite")} <gold>→</hover></click>"
@@ -62,6 +66,10 @@ class SearchBanListCommand(
 
             actor.reply(ColorParser.parse("<white>=== $footerButtons <white>==="))
             actor.reply(ColorParser.parse(""))
+        }.exceptionally { e ->
+            org.slf4j.LoggerFactory.getLogger(SearchBanListCommand::class.java).error("Fehler bei /searchbanlist", e)
+            CommandUtil.replyError(actor, "Ein Fehler ist aufgetreten.")
+            null
         }
     }
 }

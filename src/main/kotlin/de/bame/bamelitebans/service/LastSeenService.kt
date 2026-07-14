@@ -19,32 +19,52 @@ class LastSeenService(
     private val executor: Executor = ForkJoinPool.commonPool()
 ) {
 
-    fun initTable() {
-        executor.execute {
-            val query = """
-                CREATE TABLE IF NOT EXISTS bamelitebans_lastseen (
-                    uuid VARCHAR(36) PRIMARY KEY,
-                    name VARCHAR(64) NOT NULL,
-                    last_seen BIGINT NOT NULL,
-                    server VARCHAR(64) NOT NULL
-                )
-            """.trimIndent()
-            try {
-                Database.get().prepareStatement(query).use { st ->
-                    st.executeUpdate()
-                }
-            } catch (e: SQLException) {
-                logger.error("Fehler beim Erstellen der Tabelle bamelitebans_lastseen", e)
+    private var cachedTableName: String? = null
+
+    fun getTableName(): String {
+        cachedTableName?.let { return it }
+        val prefix = try {
+            Database.get().prepareStatement("SELECT 1 FROM {bans} WHERE 1=0").use { st ->
+                val meta = st.metaData
+                val fullBansName = if (meta != null && meta.columnCount > 0) meta.getTableName(1) else ""
+                if (fullBansName.endsWith("bans")) {
+                    fullBansName.substring(0, fullBansName.length - 4)
+                } else ""
             }
+        } catch (_: Exception) {
+            ""
+        }
+        val name = if (prefix.isNotBlank()) "${prefix}bamelitebans_lastseen" else "bamelitebans_lastseen"
+        cachedTableName = name
+        return name
+    }
+
+    fun initTable() {
+        val table = getTableName()
+        val query = """
+            CREATE TABLE IF NOT EXISTS $table (
+                uuid VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(64) NOT NULL,
+                last_seen BIGINT NOT NULL,
+                server VARCHAR(64) NOT NULL
+            )
+        """.trimIndent()
+        try {
+            Database.get().prepareStatement(query).use { st ->
+                st.executeUpdate()
+            }
+        } catch (e: SQLException) {
+            logger.error("Fehler beim Erstellen der Tabelle $table", e)
         }
     }
 
     fun recordLastSeen(uuid: String, name: String, server: String?) {
         executor.execute {
+            val table = getTableName()
             val now = System.currentTimeMillis()
             val serverName = server ?: "Netzwerk"
             val query = """
-                INSERT INTO bamelitebans_lastseen (uuid, name, last_seen, server) VALUES (?, ?, ?, ?)
+                INSERT INTO $table (uuid, name, last_seen, server) VALUES (?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE name = VALUES(name), last_seen = VALUES(last_seen), server = VALUES(server)
             """.trimIndent()
 
@@ -59,9 +79,9 @@ class LastSeenService(
             } catch (e: SQLException) {
                 // Fallback für SQL-Dialekte ohne ON DUPLICATE KEY UPDATE (z.B. SQLite/PostgreSQL)
                 val fallbackUpdate = if (server != null) {
-                    "UPDATE bamelitebans_lastseen SET name=?, last_seen=?, server=? WHERE uuid=?"
+                    "UPDATE $table SET name=?, last_seen=?, server=? WHERE uuid=?"
                 } else {
-                    "UPDATE bamelitebans_lastseen SET name=?, last_seen=? WHERE uuid=?"
+                    "UPDATE $table SET name=?, last_seen=? WHERE uuid=?"
                 }
                 try {
                     val updated = Database.get().prepareStatement(fallbackUpdate).use { st ->
@@ -76,7 +96,7 @@ class LastSeenService(
                         st.executeUpdate()
                     }
                     if (updated == 0) {
-                        val fallbackInsert = "INSERT INTO bamelitebans_lastseen (uuid, name, last_seen, server) VALUES (?, ?, ?, ?)"
+                        val fallbackInsert = "INSERT INTO $table (uuid, name, last_seen, server) VALUES (?, ?, ?, ?)"
                         Database.get().prepareStatement(fallbackInsert).use { st ->
                             st.setString(1, uuid)
                             st.setString(2, name)
@@ -86,7 +106,7 @@ class LastSeenService(
                         }
                     }
                 } catch (fallbackEx: SQLException) {
-                    logger.error("Fehler beim atomaren und Fallback-Upsert in bamelitebans_lastseen für $name ($uuid)", fallbackEx)
+                    logger.error("Fehler beim atomaren und Fallback-Upsert in $table für $name ($uuid)", fallbackEx)
                 }
             }
         }
@@ -109,7 +129,8 @@ class LastSeenService(
             }
 
             // 2. Abfrage in unserer eigenen bamelitebans_lastseen Tabelle
-            val query = "SELECT * FROM bamelitebans_lastseen WHERE LOWER(name)=LOWER(?) OR uuid=? ORDER BY last_seen DESC LIMIT 1"
+            val table = getTableName()
+            val query = "SELECT * FROM $table WHERE LOWER(name)=LOWER(?) OR uuid=? ORDER BY last_seen DESC LIMIT 1"
             try {
                 Database.get().prepareStatement(query).use { st ->
                     st.setString(1, playerOrUuid)
@@ -126,7 +147,7 @@ class LastSeenService(
                     }
                 }
             } catch (e: SQLException) {
-                logger.error("Fehler bei Abfrage von bamelitebans_lastseen für $playerOrUuid", e)
+                logger.error("Fehler bei Abfrage von $table für $playerOrUuid", e)
             }
 
             // 3. Fallback: Abfrage der LiteBans {history} Tabelle (für ältere Spieler)

@@ -71,6 +71,10 @@ class LastSeenCommand(
             actor.reply(ColorParser.parse(configService.lastSeenHeader()))
             actor.reply(ColorParser.parse(formattedMessage))
             actor.reply(ColorParser.parse(""))
+        }.exceptionally { e ->
+            org.slf4j.LoggerFactory.getLogger(LastSeenCommand::class.java).error("Fehler bei /lastseen", e)
+            de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Ein Fehler ist aufgetreten.")
+            null
         }
     }
 }

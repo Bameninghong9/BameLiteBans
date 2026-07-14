@@ -119,6 +119,36 @@ class LiteBansHistoryService(
         }
     }
 
+    private fun mapRowToEntry(
+        rs: ResultSet,
+        type: PunishmentType,
+        targetName: String,
+        staffName: String
+    ): PunishmentEntry {
+        val id = rs.getLong("id")
+        val rawReason = safeGetString(rs, "reason") ?: "Kein Grund angegeben"
+        val time = safeGetTimeMillis(rs, "time")
+        val until = safeGetTimeMillis(rs, "until")
+        val active = try { rs.getBoolean("active") } catch (e: Exception) { false }
+        val removedByName = safeGetString(rs, "removed_by_name")
+        val removedByReason = safeGetString(rs, "removed_by_reason")
+        val removedByDateMillis = safeGetLong(rs, "removed_by_date")
+
+        return PunishmentEntry(
+            id = id,
+            type = type,
+            targetName = targetName,
+            staffName = staffName,
+            reason = rawReason,
+            timestampMillis = time,
+            untilMillis = until,
+            active = active,
+            removedByName = removedByName,
+            removedByDateMillis = removedByDateMillis,
+            removedByReason = removedByReason
+        )
+    }
+
     private fun queryTable(
         uuid: String,
         targetName: String,
@@ -133,32 +163,8 @@ class LiteBansHistoryService(
                 st.setString(1, uuid)
                 st.executeQuery().use { rs: ResultSet ->
                     while (rs.next()) {
-                        val id = rs.getLong("id")
-                        val rawReason = safeGetString(rs, "reason") ?: "Kein Grund angegeben"
                         val staffName = safeGetString(rs, "banned_by_name") ?: "Konsole"
-                        val time = safeGetTimeMillis(rs, "time")
-                        val until = safeGetTimeMillis(rs, "until")
-                        val active = try { rs.getBoolean("active") } catch (e: Exception) { false }
-
-                        val removedByName = safeGetString(rs, "removed_by_name")
-                        val removedByReason = safeGetString(rs, "removed_by_reason")
-                        val removedByDateMillis = safeGetLong(rs, "removed_by_date")
-
-                        list.add(
-                            PunishmentEntry(
-                                id = id,
-                                type = type,
-                                targetName = targetName,
-                                staffName = staffName,
-                                reason = rawReason,
-                                timestampMillis = time,
-                                untilMillis = until,
-                                active = active,
-                                removedByName = removedByName,
-                                removedByDateMillis = removedByDateMillis,
-                                removedByReason = removedByReason
-                            )
-                        )
+                        list.add(mapRowToEntry(rs, type, targetName, staffName))
                     }
                 }
             }
@@ -233,34 +239,10 @@ class LiteBansHistoryService(
                 st.setString(2, staffUuid)
                 st.executeQuery().use { rs: ResultSet ->
                     while (rs.next()) {
-                        val id = rs.getLong("id")
                         val targetUuid = safeGetString(rs, "uuid") ?: "unbekannt"
                         val targetName = nameCache.computeIfAbsent(targetUuid) { resolvePlayerName(it) }
-
                         val executorName = safeGetString(rs, "banned_by_name") ?: staffName
-                        val rawReason = safeGetString(rs, "reason") ?: ""
-                        val time = safeGetTimeMillis(rs, "time")
-                        val until = safeGetTimeMillis(rs, "until")
-                        val active = try { rs.getBoolean("active") } catch (e: Exception) { false }
-                        val removedByName = safeGetString(rs, "removed_by_name")
-                        val removedByDateMillis = safeGetLong(rs, "removed_by_date")
-                        val removedByReason = safeGetString(rs, "removed_by_reason")
-
-                        list.add(
-                            PunishmentEntry(
-                                id = id,
-                                type = type,
-                                targetName = targetName,
-                                staffName = executorName,
-                                reason = rawReason,
-                                timestampMillis = time,
-                                untilMillis = until,
-                                active = active,
-                                removedByName = removedByName,
-                                removedByDateMillis = removedByDateMillis,
-                                removedByReason = removedByReason
-                            )
-                        )
+                        list.add(mapRowToEntry(rs, type, targetName, executorName))
                     }
                 }
             }
@@ -322,32 +304,9 @@ class LiteBansHistoryService(
 
                         st.executeQuery().use { rs: ResultSet ->
                             while (rs.next()) {
-                                val id = rs.getLong("id")
                                 val targetUuid = safeGetString(rs, "uuid") ?: "unbekannt"
                                 val staffName = safeGetString(rs, "banned_by_name") ?: "Konsole"
-                                val rawReason = safeGetString(rs, "reason") ?: "Kein Grund angegeben"
-                                val time = safeGetTimeMillis(rs, "time")
-                                val until = safeGetTimeMillis(rs, "until")
-                                val active = try { rs.getBoolean("active") } catch (e: Exception) { false }
-                                val removedByName = safeGetString(rs, "removed_by_name")
-                                val removedByDateMillis = safeGetLong(rs, "removed_by_date")
-                                val removedByReason = safeGetString(rs, "removed_by_reason")
-
-                                pageEntries.add(
-                                    PunishmentEntry(
-                                        id = id,
-                                        type = PunishmentType.BAN,
-                                        targetName = targetUuid,
-                                        staffName = staffName,
-                                        reason = rawReason,
-                                        timestampMillis = time,
-                                        untilMillis = until,
-                                        active = active,
-                                        removedByName = removedByName,
-                                        removedByDateMillis = removedByDateMillis,
-                                        removedByReason = removedByReason
-                                    )
-                                )
+                                pageEntries.add(mapRowToEntry(rs, PunishmentType.BAN, targetUuid, staffName))
                             }
                         }
                     }

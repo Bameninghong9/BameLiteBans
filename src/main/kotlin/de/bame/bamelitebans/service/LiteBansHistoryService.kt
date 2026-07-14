@@ -285,13 +285,10 @@ class LiteBansHistoryService(
                 .sortedByDescending { it.total }
                 .take(10)
 
-            val prefixFutures = topList.map { entry ->
-                CompletableFuture.runAsync({
-                    val uuidToUse = entry.staffUuid ?: resolvePlayerUuid(entry.staffName)
-                    entry.luckPermsPrefix = luckPermsService.getPrefix(uuidToUse)
-                }, executor)
+            for (entry in topList) {
+                val uuidToUse = entry.staffUuid ?: resolvePlayerUuid(entry.staffName)
+                entry.luckPermsPrefix = luckPermsService.getPrefix(uuidToUse)
             }
-            CompletableFuture.allOf(*prefixFutures.toTypedArray()).join()
 
             topList
         }, executor)

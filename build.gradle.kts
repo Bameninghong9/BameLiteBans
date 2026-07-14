@@ -1,6 +1,6 @@
 plugins {
     kotlin("jvm") version "1.9.23"
-    id("com.github.johnrengelman.shadow") version "8.1.1"
+    id("com.gradleup.shadow") version "8.3.6"
 }
 
 group = "de.bame"
@@ -39,10 +39,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
 tasks {
     shadowJar {
         archiveClassifier.set("")
-        // Relocate Lamp, Kotlin und TOML to prevent conflicts with other plugins
-        relocate("revxrsal.commands", "de.bame.bamelitebans.shadow.lamp")
-        relocate("kotlin", "de.bame.bamelitebans.shadow.kotlin")
-        relocate("com.moandjiezana.toml", "de.bame.bamelitebans.shadow.toml")
     }
 
     build {

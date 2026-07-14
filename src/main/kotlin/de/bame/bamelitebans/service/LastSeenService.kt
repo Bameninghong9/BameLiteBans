@@ -39,37 +39,39 @@ class LastSeenService(
         }
     }
 
-    fun recordLastSeen(uuid: String, name: String, server: String) {
+    fun recordLastSeen(uuid: String, name: String, server: String?) {
         executor.execute {
             val now = System.currentTimeMillis()
-            val updateQuery = "UPDATE bamelitebans_lastseen SET name=?, last_seen=?, server=? WHERE uuid=?"
+            val updateQuery = if (server != null) {
+                "UPDATE bamelitebans_lastseen SET name=?, last_seen=?, server=? WHERE uuid=?"
+            } else {
+                "UPDATE bamelitebans_lastseen SET name=?, last_seen=? WHERE uuid=?"
+            }
+
             try {
                 val updated = Database.get().prepareStatement(updateQuery).use { st ->
                     st.setString(1, name)
                     st.setLong(2, now)
-                    st.setString(3, server)
-                    st.setString(4, uuid)
+                    if (server != null) {
+                        st.setString(3, server)
+                        st.setString(4, uuid)
+                    } else {
+                        st.setString(3, uuid)
+                    }
                     st.executeUpdate()
                 }
                 if (updated == 0) {
+                    val fallbackServer = server ?: "Netzwerk"
                     val insertQuery = "INSERT INTO bamelitebans_lastseen (uuid, name, last_seen, server) VALUES (?, ?, ?, ?)"
                     try {
                         Database.get().prepareStatement(insertQuery).use { st ->
                             st.setString(1, uuid)
                             st.setString(2, name)
                             st.setLong(3, now)
-                            st.setString(4, server)
+                            st.setString(4, fallbackServer)
                             st.executeUpdate()
                         }
-                    } catch (_: SQLException) {
-                        Database.get().prepareStatement(updateQuery).use { st ->
-                            st.setString(1, name)
-                            st.setLong(2, now)
-                            st.setString(3, server)
-                            st.setString(4, uuid)
-                            st.executeUpdate()
-                        }
-                    }
+                    } catch (_: SQLException) {}
                 }
             } catch (e: SQLException) {
                 logger.error("Fehler beim Speichern in bamelitebans_lastseen ($name / $server)", e)

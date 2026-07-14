@@ -30,7 +30,7 @@ class StaffTopCommand(
         if (period?.lowercase() == "own") {
             if (!actor.source().hasPermission("bamelitebans.command.stafftop.own") &&
                 !actor.source().hasPermission("bamelitebans.command.stafftop")) {
-                actor.reply(ColorParser.parse("<red>Dazu hast du keine Berechtigung."))
+                de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Dazu hast du keine Berechtigung.")
                 return
             }
             handleOwn(actor)
@@ -42,11 +42,11 @@ class StaffTopCommand(
                 if (period == null) {
                     handleOwn(actor)
                 } else {
-                    actor.reply(ColorParser.parse("<red>Du hast nur die Berechtigung für <yellow>/stafftop own<red>."))
+                    de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Du hast nur die Berechtigung für <yellow>/stafftop own<white>.")
                 }
                 return
             }
-            actor.reply(ColorParser.parse("<red>Dazu hast du keine Berechtigung."))
+            de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Dazu hast du keine Berechtigung.")
             return
         }
 
@@ -54,12 +54,16 @@ class StaffTopCommand(
             "day", "today", "heute", "tag", "1d" -> "ᴛᴏᴅᴀʏ" to LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
             "monat", "month", "30d" -> "ʟᴀsᴛ ᴍᴏɴᴛʜ" to (System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000)
             "all", "gesamt", "alltime" -> "ᴀʟʟ ᴛɪᴍᴇ" to 0L
-            else -> "ʟᴀsᴛ ᴡᴇᴇᴋ" to (System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000)
+            null, "week", "woche", "7d" -> "ʟᴀsᴛ ᴡᴇᴇᴋ" to (System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000)
+            else -> {
+                de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Ungültiger Zeitraum '<yellow>$period<white>'. Erlaubt: <yellow>tag, woche, monat, all<white>.")
+                return
+            }
         }
 
         historyService.fetchStaffTop(sinceMillis).thenAccept { entries ->
             if (entries.isEmpty()) {
-                actor.reply(ColorParser.parse(configService.stafftopEmpty(periodSmallCaps)))
+                de.bame.bamelitebans.util.CommandUtil.replyError(actor, configService.stafftopEmpty(periodSmallCaps))
                 return@thenAccept
             }
 
@@ -111,7 +115,7 @@ class StaffTopCommand(
             }
 
             actor.reply(ColorParser.parse(""))
-            actor.reply(ColorParser.parse("<gold>🏆 <green>Staff-Leaderboard (own):"))
+            actor.reply(ColorParser.parse(configService.stafftopHeader("ᴏᴡɴ")))
             actor.reply(ColorParser.parse(""))
             val lineText = "<green>#$rank<white>: $prefix<!bold><!italic>$name<reset><white>: <red>$bans Bans <gray>| <yellow>$mutes Mutes <gray>| <green>$warns Warns"
             actor.reply(ColorParser.parse(lineText))

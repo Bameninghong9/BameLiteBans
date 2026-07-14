@@ -123,10 +123,7 @@ class ConfigService(private val dataDirectory: Path) {
         get() = toml.getString("punishment.expired_tag") ?: "<white> [<#828FE7>ᴀʙɢᴇʟᴀᴜꜰᴇɴ<white>]"
 
     fun stafftopHeader(period: String): String {
-        var template = toml.getString("messages.stafftop_header") ?: "<gold>🏆 <green>Staff-Leaderboard ({period}):"
-        if (template.contains("Moderations-Leaderboard") || template.contains("sᴛᴀꜰꜰ-ʟᴇᴀᴅᴇʀʙᴏᴀʀᴅ")) {
-            template = "<gold>🏆 <green>Staff-Leaderboard ({period}):"
-        }
+        val template = toml.getString("messages.stafftop_header") ?: "<gold>🏆 <green>Staff-Leaderboard ({period}):"
         return template.replace("{period}", period)
     }
 
@@ -186,10 +183,7 @@ class ConfigService(private val dataDirectory: Path) {
             }
         } catch (_: Exception) {}
 
-        if (result.size == 1 && (lowerQuery == "cheats" || lowerQuery == "hacks" || lowerQuery == "clientmodifikation" || lowerQuery.contains("clientmod"))) {
-            result.addAll(listOf("hacks", "cheats", "unerlaubte clientmodifikation", "clientmodifikation"))
-        }
-
         return result.toList()
     }
 }
+

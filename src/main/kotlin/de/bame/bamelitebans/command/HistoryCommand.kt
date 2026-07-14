@@ -26,18 +26,18 @@ class HistoryCommand(
         @Optional reason: String?
     ) {
         if (playerName.isNullOrBlank()) {
-            actor.reply(ColorParser.parse("<red>Verwendung: /searchhistory <player> [grund]"))
+            de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Verwendung: /searchhistory <player> [grund]")
             return
         }
 
-        val (actualReason, displayLimit) = parseReasonAndLimit(reason, 100)
+        val (actualReason, displayLimit) = de.bame.bamelitebans.util.CommandUtil.parseReasonAndLimit(reason, 100)
         val keywords = configService.getSearchKeywords(actualReason)
         historyService.fetchHistory(playerName, keywords).thenAccept { entries ->
             if (entries.isEmpty()) {
                 if (actualReason.isNullOrBlank()) {
-                    actor.reply(ColorParser.parse(configService.playerNotFound))
+                    de.bame.bamelitebans.util.CommandUtil.replyError(actor, configService.playerNotFound)
                 } else {
-                    actor.reply(ColorParser.parse("<red>Keine Einträge mit Grund '<yellow>$actualReason<red>' für <#92F254>$playerName <red>gefunden."))
+                    de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Keine Einträge mit Grund '<yellow>$actualReason<white>' für <#92F254>$playerName <white>gefunden.")
                 }
                 return@thenAccept
             }
@@ -61,22 +61,5 @@ class HistoryCommand(
             }
         }
     }
-
-    private fun parseReasonAndLimit(rawReason: String?, defaultLimit: Int = 100): Pair<String?, Int> {
-        if (rawReason.isNullOrBlank()) return null to defaultLimit
-        val trimmed = rawReason.trim()
-        val pureNumber = trimmed.toIntOrNull()
-        if (pureNumber != null && pureNumber > 0) {
-            return null to pureNumber
-        }
-        val lastSpace = trimmed.lastIndexOf(' ')
-        if (lastSpace != -1) {
-            val possibleNumber = trimmed.substring(lastSpace + 1).toIntOrNull()
-            if (possibleNumber != null && possibleNumber >= 5) {
-                val actualReason = trimmed.substring(0, lastSpace).trim()
-                return (if (actualReason.isEmpty()) null else actualReason) to possibleNumber
-            }
-        }
-        return trimmed to defaultLimit
-    }
 }
+

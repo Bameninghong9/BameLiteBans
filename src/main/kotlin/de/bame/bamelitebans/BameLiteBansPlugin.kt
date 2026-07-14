@@ -82,7 +82,7 @@ class BameLiteBansPlugin @Inject constructor(
     @Subscribe
     fun onDisconnect(event: DisconnectEvent) {
         val player = event.player
-        val serverName = player.currentServer.map { it.serverInfo.name }.orElse("Netzwerk")
+        val serverName = player.currentServer.map { it.serverInfo.name }.orElse(null)
         lastSeenService.recordLastSeen(player.uniqueId.toString(), player.username, serverName)
     }
 }

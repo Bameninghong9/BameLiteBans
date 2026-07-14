@@ -36,13 +36,13 @@ class LastSeenCommand(
         @Optional @SuggestWith(OnlinePlayerSuggestionProvider::class) playerName: String?
     ) {
         if (playerName.isNullOrBlank()) {
-            actor.reply(ColorParser.parse("<red>Verwendung: /lastseen <spieler>"))
+            de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Verwendung: /lastseen <spieler>")
             return
         }
 
         lastSeenService.fetchLastSeen(playerName).thenAccept { entry ->
             if (entry == null) {
-                actor.reply(ColorParser.parse("<red>Keine Daten zu <yellow>$playerName <red>gefunden."))
+                de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Keine Daten zu <yellow>$playerName <white>gefunden.")
                 return@thenAccept
             }
 

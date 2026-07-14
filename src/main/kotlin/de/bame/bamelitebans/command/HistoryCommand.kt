@@ -59,7 +59,9 @@ class HistoryCommand(
 
             if (entries.size > displayLimit) {
                 val remaining = entries.size - displayLimit
-                actor.reply(ColorParser.parse("<gray>... und <#FFFE00>$remaining <gray>weitere ältere Einträge ausgeblendet (Limit: $displayLimit). Nutze z.B. <yellow>/searchhist $playerName $actualReason ${entries.size} <gray>um alle anzuzeigen."))
+                val safePlayer = ColorParser.escape(playerName)
+                val safeReason = ColorParser.escape(actualReason ?: "")
+                actor.reply(ColorParser.parse("<gray>... und <#FFFE00>$remaining <gray>weitere ältere Einträge ausgeblendet (Limit: $displayLimit). Nutze z.B. <yellow>/searchhist $safePlayer $safeReason ${entries.size} <gray>um alle anzuzeigen."))
             }
         }
     }

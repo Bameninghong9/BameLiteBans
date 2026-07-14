@@ -59,7 +59,9 @@ class StaffHistoryCommand(
 
             if (entries.size > displayLimit) {
                 val remaining = entries.size - displayLimit
-                actor.reply(ColorParser.parse("<gray>... und <#FFFE00>$remaining <gray>weitere ältere Einträge ausgeblendet (Limit: $displayLimit). Nutze z.B. <yellow>/searchstaffhist $staffName $actualReason ${entries.size} <gray>um alle anzuzeigen."))
+                val safeStaff = ColorParser.escape(staffName)
+                val safeReason = ColorParser.escape(actualReason ?: "")
+                actor.reply(ColorParser.parse("<gray>... und <#FFFE00>$remaining <gray>weitere ältere Einträge ausgeblendet (Limit: $displayLimit). Nutze z.B. <yellow>/searchstaffhist $safeStaff $safeReason ${entries.size} <gray>um alle anzuzeigen."))
             }
         }
     }

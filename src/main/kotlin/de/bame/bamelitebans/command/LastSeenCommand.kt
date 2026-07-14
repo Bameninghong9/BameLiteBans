@@ -42,7 +42,8 @@ class LastSeenCommand(
 
         lastSeenService.fetchLastSeen(playerName).thenAccept { entry ->
             if (entry == null) {
-                de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Keine Daten zu <yellow>$playerName <white>gefunden.")
+                val safeName = ColorParser.escape(playerName)
+                de.bame.bamelitebans.util.CommandUtil.replyError(actor, "Keine Daten zu <yellow>$safeName <white>gefunden.")
                 return@thenAccept
             }
 
@@ -60,7 +61,7 @@ class LastSeenCommand(
             val auf = SmallCaps.convert("auf")
             val safeServer = ColorParser.escape(entry.server)
             val serverStr = SmallCaps.convert(safeServer)
-            val onlineStr = if (entry.isOnline) "<green>${SmallCaps.convert("online")}" else "<red>${SmallCaps.convert("offline")}"
+            val onlineStr = if (entry.isOnline) "<green>${SmallCaps.convert("[online]")}" else "<red>${SmallCaps.convert("[offline]")}"
 
             val formattedMessage = configService.lastSeenFormat(
                 prefixName, warZuletztAm, dateStr, um, timeStr, auf, serverStr, onlineStr

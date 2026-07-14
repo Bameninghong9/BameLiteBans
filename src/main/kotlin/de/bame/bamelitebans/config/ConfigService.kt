@@ -56,6 +56,9 @@ class ConfigService(private val dataDirectory: Path) {
             lastseen_header = "<white>⌚ <b><gradient:#FFFE00:#F9F869>ʟᴀsᴛ sᴇᴇɴ"
             lastseen_format = "{prefix_name}<reset> <gray>{war_zuletzt_am} <#FFFE00>{date} <gray>{um} <#FFFE00>{time} <gray>{auf} <#FFFE00>{server} <gray>{online}"
 
+            # Header für /searchbanlist
+            searchbanlist_header = "<white>=== <green>ᴘᴀɢᴇ <gold>{page} <green>ᴏᴜᴛ ᴏꜰ <gold>{total} <white>==="
+
             # Meldung wenn im gewählten Zeitraum keine Strafen gefunden wurden
             stafftop_empty = "<red>Keine Moderationsaktivität im Zeitraum <yellow>{period} <red>gefunden."
 
@@ -181,6 +184,14 @@ class ConfigService(private val dataDirectory: Path) {
         } catch (_: Exception) {}
 
         return result.toList()
+    }
+
+    fun searchBanListHeader(page: Int, total: Int): String {
+        val template = toml.getString("messages.searchbanlist_header")
+            ?: "<white>=== <green>ᴘᴀɢᴇ <gold>{page} <green>ᴏᴜᴛ ᴏꜰ <gold>{total} <white>==="
+        return template
+            .replace("{page}", page.toString())
+            .replace("{total}", total.toString())
     }
 }
 

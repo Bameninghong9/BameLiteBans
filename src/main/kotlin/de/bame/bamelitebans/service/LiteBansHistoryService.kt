@@ -271,6 +271,85 @@ class LiteBansHistoryService(
         return list
     }
 
+    fun fetchGlobalBans(
+        keywords: List<String>,
+        page: Int,
+        pageSize: Int
+    ): CompletableFuture<Triple<List<PunishmentEntry>, Int, Int>> {
+        return CompletableFuture.supplyAsync({
+            val allMatches = mutableListOf<PunishmentEntry>()
+            val query = if (keywords.isNotEmpty()) {
+                val conditions = keywords.joinToString(" OR ") { "LOWER(reason) LIKE ?" }
+                "SELECT * FROM {bans} WHERE ($conditions) ORDER BY time DESC"
+            } else {
+                "SELECT * FROM {bans} ORDER BY time DESC"
+            }
+
+            try {
+                Database.get().prepareStatement(query).use { st ->
+                    if (keywords.isNotEmpty()) {
+                        keywords.forEachIndexed { i, kw ->
+                            st.setString(i + 1, "%${kw.lowercase()}%")
+                        }
+                    }
+                    st.executeQuery().use { rs: ResultSet ->
+                        while (rs.next()) {
+                            val id = rs.getLong("id")
+                            val targetUuid = safeGetString(rs, "uuid") ?: "unbekannt"
+                            val staffName = safeGetString(rs, "banned_by_name") ?: "Konsole"
+                            val rawReason = safeGetString(rs, "reason") ?: "Kein Grund angegeben"
+                            val time = safeGetTimeMillis(rs, "time")
+                            val until = safeGetTimeMillis(rs, "until")
+                            val active = try { rs.getBoolean("active") } catch (e: Exception) { false }
+                            val removedByName = safeGetString(rs, "removed_by_name")
+                            val removedByDateMillis = safeGetLong(rs, "removed_by_date")
+                            val removedByReason = safeGetString(rs, "removed_by_reason")
+
+                            allMatches.add(
+                                PunishmentEntry(
+                                    id = id,
+                                    type = PunishmentType.BAN,
+                                    targetName = targetUuid,
+                                    staffName = staffName,
+                                    reason = rawReason,
+                                    timestampMillis = time,
+                                    untilMillis = until,
+                                    active = active,
+                                    removedByName = removedByName,
+                                    removedByDateMillis = removedByDateMillis,
+                                    removedByReason = removedByReason
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (e: SQLException) {
+                logger.error("Fehler bei DB-Query in fetchGlobalBans", e)
+            }
+
+            allMatches.sortWith(compareByDescending<PunishmentEntry> { it.timestampMillis }.thenByDescending { it.id })
+
+            val totalCount = allMatches.size
+            val totalPages = if (totalCount == 0) 1 else ((totalCount - 1) / pageSize) + 1
+            val validPage = page.coerceIn(1, totalPages)
+            val fromIndex = (validPage - 1) * pageSize
+            val toIndex = (fromIndex + pageSize).coerceAtMost(totalCount)
+            val pageEntries = if (totalCount > 0) allMatches.subList(fromIndex, toIndex) else emptyList()
+
+            val nameCache = mutableMapOf<String, String>()
+            val resolvedPageEntries = pageEntries.map { entry ->
+                if (entry.targetName.matches(UUID_PATTERN)) {
+                    val resolved = nameCache.computeIfAbsent(entry.targetName) { resolvePlayerName(it) }
+                    entry.copy(targetName = resolved)
+                } else {
+                    entry
+                }
+            }
+
+            Triple(resolvedPageEntries, validPage, totalPages)
+        }, executor)
+    }
+
     fun fetchStaffTop(sinceMillis: Long): CompletableFuture<List<StaffTopEntry>> {
         return CompletableFuture.supplyAsync({
             val map = mutableMapOf<String, StaffTopEntry>()

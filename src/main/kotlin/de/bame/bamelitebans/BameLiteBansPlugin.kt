@@ -66,10 +66,11 @@ class BameLiteBansPlugin @Inject constructor(
         lamp.register(StaffTopCommand(historyService, configService))
         lamp.register(ReloadCommand(configService))
         lamp.register(LastSeenCommand(lastSeenService, luckPermsService, configService))
+        lamp.register(SearchBanListCommand(historyService, configService))
 
         lamp.accept(VelocityVisitors.brigadier(proxy))
 
-        logger.info("BameLiteBans erfolgreich initialisiert! Befehle /searchhistory, /searchstaffhistory, /stafftop, /lastseen und /bamelitebans reload sind einsatzbereit.")
+        logger.info("BameLiteBans erfolgreich initialisiert! Befehle /searchhistory, /searchstaffhistory, /searchbanlist, /stafftop, /lastseen und /bamelitebans reload sind einsatzbereit.")
     }
 
     @Subscribe

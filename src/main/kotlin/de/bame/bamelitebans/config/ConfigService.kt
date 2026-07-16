@@ -9,6 +9,7 @@ class ConfigService(private val dataDirectory: Path) {
 
     private var toml: Toml = Toml()
     private var webhookToml: Toml = Toml()
+    private var automodToml: Toml = Toml()
 
     init {
         loadConfig()
@@ -30,6 +31,12 @@ class ConfigService(private val dataDirectory: Path) {
             writeDefaultWebhookConfig(webhookFile)
         }
         webhookToml = Toml().read(webhookFile)
+
+        val automodFile = dataDirectory.resolve("automod.toml").toFile()
+        if (!automodFile.exists()) {
+            writeDefaultAutoModConfig(automodFile)
+        }
+        automodToml = Toml().read(automodFile)
     }
 
     private fun writeDefaultConfig(file: File) {
@@ -140,6 +147,86 @@ class ConfigService(private val dataDirectory: Path) {
             color_unban = 65280       # Grün
             color_unmute = 49151      # Hellblau
             color_unwarn = 2142890    # Türkis
+        """.trimIndent()
+
+        file.writeText(defaultContent, Charsets.UTF_8)
+    }
+
+    private fun writeDefaultAutoModConfig(file: File) {
+        val defaultContent = """
+            # ==============================================================================
+            #                 BAME LITEBANS - AUTO MODERATION & KI ENGINE
+            #          Automatische Erkennung, Blockierung & Bestrafung bei Verstößen
+            # ==============================================================================
+
+            [automod]
+            # Hauptschalter: Das gesamte AutoMod-System aktivieren oder deaktivieren
+            # Standardmäßig auf 'false' (zum Aktivieren auf 'true' setzen und /bamelitebans reload ausführen)
+            enabled = false
+
+
+            # ==============================================================================
+            # 1. SPAM-SCHUTZ (Nachrichten-Duplikate verhindern)
+            # ==============================================================================
+            [spam]
+            enabled = true
+            # Nach wie vielen gleichen Nachrichten soll blockiert werden? (2 = ab der 3. Nachricht blocken)
+            max_duplicates = 2
+            # Nach wie vielen Minuten wird der Zähler für dieselbe Nachricht zurückgesetzt?
+            cooldown_minutes = 10
+            # Nachricht an den Spieler bei Blockierung wegen Spam
+            player_message = "<red>Please do not spam the same message!"
+            # Benachrichtigung an das Team im Chat und an die Konsole
+            staff_message = "<red>Player %player% tried to spam!"
+            # Ab wie vielen Versuchen soll zusätzlich automatisch gemutet werden? (0 = nur blockieren & warnen)
+            mute_after_attempts = 4
+            command = "/tempmute %player% 30m Spam"
+
+
+            # ==============================================================================
+            # 2. MUTES (Stummschaltungen)
+            # ==============================================================================
+            [mutes]
+            # Mutes aktivieren/deaktivieren.
+            # Wenn 'enabled = false': Nachrichten mit Mute-Gründen werden TROTZDEM im Chat GEBLOCKT
+            # und die 'blocked_message' gesendet, aber es wird KEIN Mute-Befehl (/tempmute) ausgeführt!
+            enabled = true
+            blocked_message = "<red>Deine Message wurde blockiert, da du dich nicht an die Chat Regeln gehalten hast"
+
+                [mutes.reasons]
+                beleidigung = "/tempmute %player% 1h Beleidigung"
+                provokation = "/tempmute %player% 1h Provokation"
+                sexistisches_verhalten = "/tempmute %player% 6h Sexistisches Verhalten"
+                server_hetze = "/tempmute %player% 7d Server hetze"
+                nsfw = "/tempmute %player% 7d NSFW / Unangemessene Inhalte"
+
+
+            # ==============================================================================
+            # 3. BANS (Ausschlüsse)
+            # Bans werden bei Verstoß IMMER ausgeführt (solange [automod] enabled = true ist)
+            # ==============================================================================
+            [bans]
+                [bans.reasons]
+                werbung = "/tempban %player% 7d Werbung"
+                rassismus = "/tempban %player% 30d Rassismus"
+                nationalsozialismus = "/tempban %player% 30d Nationalsozialismus"
+                antisemitismus = "/tempban %player% 30d Antisemitismus"
+
+                # Erlaubte Domains/IPs, die NICHT als Werbung erkannt und nicht gebannt werden:
+                allowed_domains = ["srino.net", "test.net"]
+
+
+            # ==============================================================================
+            # 4. KI / AI HEURISTIK & API EINSTELLUNGEN
+            # ==============================================================================
+            [ai]
+            # Optional: Falls API-Key leer ("") ist, läuft unsere blitzschnelle lokale Smart-Regex direkt am Proxy (empfohlen)
+            api_key = ""
+            api_url = "https://api.openai.com/v1/chat/completions"
+            model = "gpt-4o-mini"
+            # Team-Benachrichtigung bei Auto-Punish (Mute / Ban) im Chat?
+            notify_team = true
+            notify_message = "<red>🤖 <b>[KI-AutoMod]</b> <yellow>%player% <gray>wurde automatisch bestraft wegen: <red><b>%category%</b> <gray>(%message%)"
         """.trimIndent()
 
         file.writeText(defaultContent, Charsets.UTF_8)
@@ -330,4 +417,74 @@ class ConfigService(private val dataDirectory: Path) {
             defaultColor
         }
     }
+
+    val isAutoModEnabled: Boolean
+        get() = automodToml.getBoolean("automod.enabled") ?: automodToml.getBoolean("ai.enabled") ?: automodToml.getBoolean("enabled") ?: false
+
+    val isSpamEnabled: Boolean
+        get() = automodToml.getBoolean("spam.enabled") ?: true
+
+    val spamMaxDuplicates: Int
+        get() = (automodToml.getLong("spam.max_duplicates") ?: 2L).toInt()
+
+    val spamCooldownMinutes: Long
+        get() = automodToml.getLong("spam.cooldown_minutes") ?: 10L
+
+    val spamPlayerMessage: String
+        get() = automodToml.getString("spam.player_message") ?: "<red>Please do not spam the same message!"
+
+    val spamStaffMessage: String
+        get() = automodToml.getString("spam.staff_message") ?: "<red>Player %player% tried to spam!"
+
+    val spamMuteAfterAttempts: Int
+        get() = (automodToml.getLong("spam.mute_after_attempts") ?: 4L).toInt()
+
+    val spamCommand: String
+        get() = automodToml.getString("spam.command") ?: "/tempmute %player% 30m Spam"
+
+    val areMutesEnabled: Boolean
+        get() = automodToml.getBoolean("mutes.enabled") ?: true
+
+    val mutesBlockedMessage: String
+        get() = automodToml.getString("mutes.blocked_message") ?: "<red>Deine Message wurde blockiert, da du dich nicht an die Chat Regeln gehalten hast"
+
+    val aiApiKey: String
+        get() = automodToml.getString("ai.api_key") ?: automodToml.getString("api_key") ?: ""
+
+    val aiApiUrl: String
+        get() = automodToml.getString("ai.api_url") ?: automodToml.getString("api_url") ?: "https://api.openai.com/v1/chat/completions"
+
+    val aiModel: String
+        get() = automodToml.getString("ai.model") ?: automodToml.getString("model") ?: "gpt-4o-mini"
+
+    val notifyTeamAutoMod: Boolean
+        get() = automodToml.getBoolean("ai.notify_team") ?: automodToml.getBoolean("notify_team") ?: true
+
+    val notifyMessageAutoMod: String
+        get() = automodToml.getString("ai.notify_message") ?: automodToml.getString("notify_message") ?: "<red>🤖 <b>[KI-AutoMod]</b> <yellow>%player% <gray>wurde automatisch bestraft wegen: <red><b>%category%</b> <gray>(%message%)"
+
+    fun isMuteCategory(category: String): Boolean {
+        val cat = category.lowercase().trim()
+        if (cat in listOf("beleidigung", "provokation", "sexistisches_verhalten", "server_hetze", "nsfw", "spam")) return true
+        return automodToml.getString("mutes.reasons.$cat") != null
+    }
+
+    fun getAutoModCommand(category: String): String? {
+        val cat = category.lowercase().trim()
+        return automodToml.getString("mutes.reasons.$cat")
+            ?: automodToml.getString("bans.reasons.$cat")
+            ?: automodToml.getString("$cat.command")
+            ?: automodToml.getString("command", if (isMuteCategory(cat)) "/tempmute %player% 1d $cat" else "/tempban %player% 30d $cat")
+    }
+
+    val allowedAdvertisingDomains: List<String>
+        get() {
+            val list = try {
+                automodToml.getList<String>("bans.allowed_domains")
+                    ?: automodToml.getList<String>("werbung.allowed_domains")
+                    ?: automodToml.getList<String>("werbung.allowedips")
+                    ?: automodToml.getList<String>("werbung.allowed")
+            } catch (_: Exception) { null }
+            return list ?: listOf("srino.net", "test.net")
+        }
 }

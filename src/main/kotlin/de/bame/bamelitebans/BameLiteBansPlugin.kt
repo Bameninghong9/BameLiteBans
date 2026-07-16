@@ -38,6 +38,7 @@ class BameLiteBansPlugin @Inject constructor(
     private lateinit var configService: ConfigService
     private lateinit var lastSeenService: LastSeenService
     private lateinit var webhookService: de.bame.bamelitebans.service.DiscordWebhookService
+    private lateinit var aiModerationService: de.bame.bamelitebans.service.AiModerationService
     private val luckPermsService = LuckPermsService()
 
     private val dbExecutor = Executors.newFixedThreadPool(4) { r ->
@@ -78,8 +79,11 @@ class BameLiteBansPlugin @Inject constructor(
         historyService = LiteBansHistoryService(logger, luckPermsService = luckPermsService, executor = dbExecutor)
         lastSeenService = LastSeenService(proxy, historyService, logger, dbExecutor)
         webhookService = de.bame.bamelitebans.service.DiscordWebhookService(configService, logger, luckPermsService)
+        aiModerationService = de.bame.bamelitebans.service.AiModerationService(proxy, configService, logger)
 
         lastSeenService.initTable()
+        proxy.eventManager.register(this, aiModerationService)
+        logger.info("✔ [BameLiteBans] KI / AutoModeration Engine (automod.toml) geladen & Event-Listener aktiv.")
 
         try {
             litebans.api.Events.get().register(liteBansListener)

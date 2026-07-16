@@ -25,7 +25,9 @@ dependencies {
     implementation("io.github.revxrsal:lamp.common:4.0.0-rc.17")
     implementation("io.github.revxrsal:lamp.velocity:4.0.0-rc.17")
     implementation("org.jetbrains.kotlin:kotlin-stdlib")
-    implementation("com.moandjiezana.toml:toml4j:0.7.2")
+    implementation("com.moandjiezana.toml:toml4j:0.7.2") {
+        exclude(group = "com.google.code.gson", module = "gson")
+    }
 }
 
 java {
@@ -39,6 +41,9 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
 tasks {
     shadowJar {
         archiveClassifier.set("")
+        minimize {
+            exclude(dependency("io.github.revxrsal:.*:.*"))
+        }
     }
 
     build {

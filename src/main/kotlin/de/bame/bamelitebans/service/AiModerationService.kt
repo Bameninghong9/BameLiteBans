@@ -57,7 +57,7 @@ class AiModerationService(
         val localMatch = checkLocalHeuristics(message)
 
         if (localMatch != null) {
-            event.result = PlayerChatEvent.ChatResult.denied()
+            event.result = PlayerChatEvent.ChatResult.message(" *** ")
             if (configService.isMuteCategory(localMatch) && !configService.areMutesEnabled) {
                 player.sendMessage(ColorParser.parse(configService.mutesBlockedMessage))
             } else {
@@ -102,7 +102,7 @@ class AiModerationService(
         try {
             val apiUrl = configService.aiApiUrl.ifBlank { "https://api.openai.com/v1/chat/completions" }
             val model = configService.aiModel.ifBlank { "gpt-4o-mini" }
-            val safeMsg = message.replace("\"", "\\\"").replace("\n", " ")
+            val safeMsg = escapeJson(message)
 
             val jsonPayload = """
                 {
@@ -168,7 +168,7 @@ class AiModerationService(
         val maxDuplicates = configService.spamMaxDuplicates
 
         if (tracker.count > maxDuplicates) {
-            event.result = PlayerChatEvent.ChatResult.denied()
+            event.result = PlayerChatEvent.ChatResult.message(" *** ")
             player.sendMessage(ColorParser.parse(configService.spamPlayerMessage))
 
             val staffMsg = ColorParser.parse(configService.spamStaffMessage.replace("%player%", player.username))
@@ -194,7 +194,7 @@ class AiModerationService(
         val rawCommand = configService.getAutoModCommand(category) ?: return
         val commandToRun = rawCommand
             .replace("%player%", player.username)
-            .replace("%message%", message)
+            .replace("%message%", sanitizeForCommand(message))
             .removePrefix("/")
             .trim()
             
@@ -207,7 +207,7 @@ class AiModerationService(
                 val notifyMsg = configService.notifyMessageAutoMod
                     .replace("%player%", player.username)
                     .replace("%category%", category.uppercase())
-                    .replace("%message%", message)
+                    .replace("%message%", ColorParser.escape(message))
 
                 val parsed = ColorParser.parse(notifyMsg)
                 proxy.allPlayers.filter { it.hasPermission("bamelitebans.notify.automod") || it.hasPermission("bamelitebans.command.reload") }
@@ -215,5 +215,23 @@ class AiModerationService(
                 proxy.consoleCommandSource.sendMessage(parsed)
             }
         }
+    }
+
+    private fun sanitizeForCommand(raw: String): String {
+        return raw
+            .replace(Regex("[\\r\\n]"), " ")
+            .replace(Regex("[\"'`;|&$]"), "")
+            .take(100)
+            .trim()
+    }
+
+    private fun escapeJson(input: String): String {
+        return input.replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\b", "\\b")
+            .replace("\u000C", "\\f") // \f corresponds to \u000C (Form feed) in Kotlin
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
     }
 }

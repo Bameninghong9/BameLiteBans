@@ -17,7 +17,6 @@ repositories {
 }
 
 dependencies {
-    // Velocity API (wird vom Proxy bereitgestellt -> compileOnly)
     compileOnly("com.velocitypowered:velocity-api:3.3.0-SNAPSHOT")
     annotationProcessor("com.velocitypowered:velocity-api:3.3.0-SNAPSHOT")
     compileOnly("com.gitlab.ruany:LiteBansAPI:0.6.1")

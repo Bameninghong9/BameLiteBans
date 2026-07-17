@@ -162,7 +162,7 @@ class ConfigService(private val dataDirectory: Path) {
             [automod]
             # Hauptschalter: Das gesamte AutoMod-System aktivieren oder deaktivieren
             # Standardmäßig auf 'false' (zum Aktivieren auf 'true' setzen und /bamelitebans reload ausführen)
-            enabled = false
+            enabled = true
 
 
             # ==============================================================================
@@ -171,7 +171,7 @@ class ConfigService(private val dataDirectory: Path) {
             [spam]
             enabled = true
             # Nach wie vielen gleichen Nachrichten soll blockiert werden? (2 = ab der 3. Nachricht blocken)
-            max_duplicates = 2
+            max_duplicates = 3
             # Nach wie vielen Minuten wird der Zähler für dieselbe Nachricht zurückgesetzt?
             cooldown_minutes = 10
             # Nachricht an den Spieler bei Blockierung wegen Spam
@@ -179,8 +179,8 @@ class ConfigService(private val dataDirectory: Path) {
             # Benachrichtigung an das Team im Chat und an die Konsole
             staff_message = "<red>Player %player% tried to spam!"
             # Ab wie vielen Versuchen soll zusätzlich automatisch gemutet werden? (0 = nur blockieren & warnen)
-            mute_after_attempts = 4
-            command = "/tempmute %player% 30m Spam"
+            mute_after_attempts = 1000
+            command = ""
 
 
             # ==============================================================================
@@ -190,7 +190,7 @@ class ConfigService(private val dataDirectory: Path) {
             # Mutes aktivieren/deaktivieren.
             # Wenn 'enabled = false': Nachrichten mit Mute-Gründen werden TROTZDEM im Chat GEBLOCKT
             # und die 'blocked_message' gesendet, aber es wird KEIN Mute-Befehl (/tempmute) ausgeführt!
-            enabled = true
+            enabled = false
             blocked_message = "<red>Deine Message wurde blockiert, da du dich nicht an die Chat Regeln gehalten hast"
 
                 [mutes.reasons]

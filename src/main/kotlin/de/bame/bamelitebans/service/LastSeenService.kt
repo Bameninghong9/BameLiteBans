@@ -6,6 +6,7 @@ import litebans.api.Database
 import org.slf4j.Logger
 import java.sql.SQLException
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.ForkJoinPool
 
@@ -20,6 +21,8 @@ class LastSeenService(
 ) {
 
     private var cachedTableName: String? = null
+    private val debounceMap = ConcurrentHashMap<String, Long>()
+    private val DEBOUNCE_INTERVAL_MS = 60_000L // 60 seconds
 
     fun getTableName(): String {
         cachedTableName?.let { return it }
@@ -59,9 +62,15 @@ class LastSeenService(
     }
 
     fun recordLastSeen(uuid: String, name: String, server: String?) {
+        val now = System.currentTimeMillis()
+        val lastUpdate = debounceMap[uuid]
+        if (lastUpdate != null && (now - lastUpdate) < DEBOUNCE_INTERVAL_MS) {
+            return
+        }
+        debounceMap[uuid] = now
+
         executor.execute {
             val table = getTableName()
-            val now = System.currentTimeMillis()
             val serverName = server ?: "Netzwerk"
             val query = """
                 INSERT INTO $table (uuid, name, last_seen, server) VALUES (?, ?, ?, ?)

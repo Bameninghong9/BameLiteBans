@@ -18,8 +18,9 @@ class ReloadCommand(
     fun onReload(actor: VelocityCommandActor) {
         configService.loadConfig()
         actor.reply(ColorParser.parse(""))
-        actor.reply(ColorParser.parse(configService.reloadHeader))
-        actor.reply(ColorParser.parse(configService.reloadSuccess))
+        actor.reply(ColorParser.parse(configService.messages.reloadHeader))
+        actor.reply(ColorParser.parse(configService.messages.reloadSuccess))
         actor.reply(ColorParser.parse(""))
     }
 }
+

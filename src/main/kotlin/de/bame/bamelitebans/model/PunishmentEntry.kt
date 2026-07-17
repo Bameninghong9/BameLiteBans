@@ -84,9 +84,9 @@ data class PunishmentEntry(
         val wasUnbannedOrUnmuted = !removedByName.isNullOrBlank()
 
         val statusTag = when {
-            isCurrentlyActive -> configService?.activeTag ?: "<white> [<red>ᴀᴋᴛɪᴠ<white>]"
+            isCurrentlyActive -> configService?.punishment?.activeTag ?: "<white> [<red>ᴀᴋᴛɪᴠ<white>]"
             wasUnbannedOrUnmuted -> ""
-            else -> configService?.expiredTag ?: "<white> [<#828FE7>ᴀʙɢᴇʟᴀᴜꜰᴇɴ<white>]"
+            else -> configService?.punishment?.expiredTag ?: "<white> [<#828FE7>ᴀʙɢᴇʟᴀᴜꜰᴇɴ<white>]"
         }
 
         val cleanReason = ColorParser.escape(reason.ifEmpty { "Kein Grund angegeben" })

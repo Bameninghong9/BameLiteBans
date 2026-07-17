@@ -25,7 +25,7 @@ class SearchBanListCommand(
         @Optional rawInput: String?
     ) {
         val (actualReason, pageNum) = CommandUtil.parseReasonAndNumber(rawInput, 1)
-        val keywords = configService.getSearchKeywords(actualReason)
+        val keywords = configService.punishment.getSearchKeywords(actualReason)
 
         historyService.fetchGlobalBans(keywords, pageNum, 10).thenAccept { (entries, page, totalPages) ->
             if (entries.isEmpty()) {
@@ -41,7 +41,7 @@ class SearchBanListCommand(
             for (i in 1..40) {
                 actor.reply(ColorParser.parse(" "))
             }
-            actor.reply(ColorParser.parse(configService.searchBanListHeader(page, totalPages)))
+            actor.reply(ColorParser.parse(configService.messages.searchBanListHeader(page, totalPages)))
 
             for (entry in entries) {
                 actor.reply(entry.toChatMessage(configService))
@@ -73,3 +73,4 @@ class SearchBanListCommand(
         }
     }
 }
+

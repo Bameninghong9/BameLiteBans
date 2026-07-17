@@ -66,12 +66,12 @@ class StaffTopCommand(
 
         historyService.fetchStaffTop(sinceMillis).thenAccept { entries ->
             if (entries.isEmpty()) {
-                de.bame.bamelitebans.util.CommandUtil.replyError(actor, configService.stafftopEmpty(periodSmallCaps))
+                de.bame.bamelitebans.util.CommandUtil.replyError(actor, configService.messages.stafftopEmpty(periodSmallCaps))
                 return@thenAccept
             }
 
             actor.reply(ColorParser.parse(""))
-            actor.reply(ColorParser.parse(configService.stafftopHeader(periodSmallCaps)))
+            actor.reply(ColorParser.parse(configService.messages.stafftopHeader(periodSmallCaps)))
             actor.reply(ColorParser.parse(""))
 
             entries.take(10).forEachIndexed { index, entry ->
@@ -126,7 +126,7 @@ class StaffTopCommand(
             }
 
             actor.reply(ColorParser.parse(""))
-            actor.reply(ColorParser.parse(configService.stafftopHeader("ᴏᴡɴ")))
+            actor.reply(ColorParser.parse(configService.messages.stafftopHeader("ᴏᴡɴ")))
             actor.reply(ColorParser.parse(""))
             val safeName = ColorParser.escape(name)
             val lineText = "<green>#$rank<white>: $prefix<!bold><!italic>$safeName<reset><white>: <red>$bans Bans <gray>| <yellow>$mutes Mutes <gray>| <green>$warns Warns <gray>| <#50BEBE>$kicks Kicks"
@@ -139,3 +139,4 @@ class StaffTopCommand(
         }
     }
 }
+

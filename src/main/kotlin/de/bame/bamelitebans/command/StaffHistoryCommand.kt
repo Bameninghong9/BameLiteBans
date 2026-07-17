@@ -30,8 +30,8 @@ class StaffHistoryCommand(
             return
         }
 
-        val (actualReason, displayLimit) = de.bame.bamelitebans.util.CommandUtil.parseReasonAndLimit(reason, 100)
-        val keywords = configService.getSearchKeywords(actualReason)
+        val (actualReason, displayLimit) = de.bame.bamelitebans.util.CommandUtil.parseReasonAndNumber(reason, 100)
+        val keywords = configService.punishment.getSearchKeywords(actualReason)
         historyService.fetchStaffHistory(staffName, keywords).thenAccept { entries ->
             if (entries.isEmpty()) {
                 val safeStaff = ColorParser.escape(staffName)
@@ -45,9 +45,9 @@ class StaffHistoryCommand(
             }
 
             val headerText = if (!actualReason.isNullOrBlank()) {
-                configService.staffHeaderSearch(staffName, actualReason, entries.size)
+                configService.messages.staffHeaderSearch(staffName, actualReason, entries.size)
             } else {
-                configService.staffHeaderAll(staffName, entries.size)
+                configService.messages.staffHeaderAll(staffName, entries.size)
             }
             actor.reply(ColorParser.parse(headerText))
 
@@ -70,4 +70,5 @@ class StaffHistoryCommand(
         }
     }
 }
+
 

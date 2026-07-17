@@ -21,32 +21,7 @@ class LuckPermsService {
         }
     }
 
-    fun getPrefixAsync(uuidStr: String?): java.util.concurrent.CompletableFuture<String> {
-        if (uuidStr.isNullOrBlank()) return java.util.concurrent.CompletableFuture.completedFuture("")
-        val now = System.currentTimeMillis()
-        val cached = prefixCache[uuidStr]
-        if (cached != null && (now - cached.second) < CACHE_TTL_MS) {
-            return java.util.concurrent.CompletableFuture.completedFuture(cached.first)
-        }
-        return try {
-            val lp = luckPerms ?: LuckPermsProvider.get().also { luckPerms = it }
-            val uuid = UUID.fromString(uuidStr)
-            val existingUser = lp.userManager.getUser(uuid)
-            if (existingUser != null) {
-                val prefix = existingUser.cachedData.metaData.prefix ?: ""
-                prefixCache[uuidStr] = prefix to now
-                java.util.concurrent.CompletableFuture.completedFuture(prefix)
-            } else {
-                lp.userManager.loadUser(uuid).thenApply { user ->
-                    val prefix = user?.cachedData?.metaData?.prefix ?: ""
-                    prefixCache[uuidStr] = prefix to now
-                    prefix
-                }.exceptionally { "" }
-            }
-        } catch (_: Exception) {
-            java.util.concurrent.CompletableFuture.completedFuture("")
-        }
-    }
+
 
     fun getPrefix(uuidStr: String?): String = runCatching {
         if (uuidStr.isNullOrBlank()) return ""
@@ -66,10 +41,6 @@ class LuckPermsService {
         prefixCache[uuidStr] = prefix to now
         prefix
     }.getOrDefault("")
-
-    fun invalidateCache(uuidStr: String?) {
-        if (uuidStr != null) prefixCache.remove(uuidStr)
-    }
 
     fun clearCache() {
         prefixCache.clear()

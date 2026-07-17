@@ -30,12 +30,12 @@ class HistoryCommand(
             return
         }
 
-        val (actualReason, displayLimit) = de.bame.bamelitebans.util.CommandUtil.parseReasonAndLimit(reason, 100)
-        val keywords = configService.getSearchKeywords(actualReason)
+        val (actualReason, displayLimit) = de.bame.bamelitebans.util.CommandUtil.parseReasonAndNumber(reason, 100)
+        val keywords = configService.punishment.getSearchKeywords(actualReason)
         historyService.fetchHistory(playerName, keywords).thenAccept { entries ->
             if (entries.isEmpty()) {
                 if (actualReason.isNullOrBlank()) {
-                    de.bame.bamelitebans.util.CommandUtil.replyError(actor, configService.playerNotFound)
+                    de.bame.bamelitebans.util.CommandUtil.replyError(actor, configService.messages.playerNotFound)
                 } else {
                     val safeReason = ColorParser.escape(actualReason)
                     val safePlayer = ColorParser.escape(playerName)
@@ -45,9 +45,9 @@ class HistoryCommand(
             }
 
             val headerText = if (!actualReason.isNullOrBlank()) {
-                configService.headerSearch(playerName, actualReason, entries.size)
+                configService.messages.headerSearch(playerName, actualReason, entries.size)
             } else {
-                configService.headerAll(playerName, entries.size)
+                configService.messages.headerAll(playerName, entries.size)
             }
             actor.reply(ColorParser.parse(headerText))
 
@@ -70,4 +70,5 @@ class HistoryCommand(
         }
     }
 }
+
 

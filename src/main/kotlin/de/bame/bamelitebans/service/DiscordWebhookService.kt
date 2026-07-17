@@ -1,6 +1,7 @@
 package de.bame.bamelitebans.service
 
 import de.bame.bamelitebans.config.ConfigService
+import de.bame.bamelitebans.util.JsonUtil
 import litebans.api.Entry
 import org.slf4j.Logger
 import java.net.URI
@@ -36,28 +37,28 @@ class DiscordWebhookService(
         .connectTimeout(Duration.ofSeconds(10))
         .build()
 
-    private val queue = ConcurrentLinkedQueue<String>()
+    private data class WebhookTask(val entry: Entry, val removed: Boolean)
+    private val queue = ConcurrentLinkedQueue<WebhookTask>()
     private val isProcessing = AtomicBoolean(false)
 
     private val dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")
         .withZone(ZoneId.systemDefault())
 
     fun sendPunishment(entry: Entry, removed: Boolean) {
-        if (!configService.isWebhookEnabled) return
+        if (!configService.webhook.isEnabled) return
 
-        val url = configService.webhookUrl
+        val url = configService.webhook.url
         if (!url.startsWith("https://discord.com/api/webhooks/") && !url.startsWith("https://discordapp.com/api/webhooks/")) {
             logger.warn("[Webhook] Ungültige Discord Webhook-URL in config.toml strukturiert. Versand abgebrochen.")
             return
         }
 
         val type = entry.type ?: return
-        if (!configService.isWebhookTypeEnabled(type, removed)) {
+        if (!configService.webhook.isTypeEnabled(type, removed)) {
             return
         }
 
-        val payload = buildJsonPayload(entry, removed)
-        queue.offer(payload)
+        queue.offer(WebhookTask(entry, removed))
         scheduleProcessQueue()
     }
 
@@ -68,18 +69,19 @@ class DiscordWebhookService(
     }
 
     private fun processNext() {
-        val payload = queue.poll()
-        if (payload == null) {
+        val task = queue.poll()
+        if (task == null) {
             isProcessing.set(false)
             return
         }
 
-        val url = configService.webhookUrl
+        val url = configService.webhook.url
         if (url.isBlank()) {
             isProcessing.set(false)
             return
         }
 
+        val payload = buildJsonPayload(task.entry, task.removed)
         sendWithRetry(url, payload, retryCount = 0)
     }
 
@@ -137,8 +139,8 @@ class DiscordWebhookService(
 
     private fun buildJsonPayload(entry: Entry, removed: Boolean): String {
         val type = entry.type ?: "unknown"
-        val title = escapeJson(configService.getWebhookTitle(type, removed))
-        val color = configService.getWebhookColor(type, removed)
+        val title = JsonUtil.escape(configService.webhook.getTitle(type, removed))
+        val color = configService.webhook.getColor(type, removed)
 
         val targetName = if (entry.uuid != null) resolveOrFormatName(entry.uuid) else (entry.ip ?: "Unbekannt")
         val rawStaffName = if (removed) {
@@ -180,18 +182,18 @@ class DiscordWebhookService(
 
         val serverOrigin = entry.serverOrigin ?: "Netzwerk"
 
-        val avatarUrl = if (entry.uuid != null && entry.uuid!!.matches(Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\$"))) {
+        val avatarUrl = if (entry.uuid != null && entry.uuid!!.matches(LiteBansHistoryService.UUID_PATTERN)) {
             "https://mc-heads.net/avatar/${entry.uuid}/64"
         } else {
             "https://mc-heads.net/avatar/X/64"
         }
 
         val fieldsBuilder = java.lang.StringBuilder()
-        fieldsBuilder.append("""{"name": "👤 **Spieler**", "value": "`${escapeJson(targetName)}`", "inline": true},""")
-        fieldsBuilder.append("""{"name": "🛡️ **Staff**", "value": "`${escapeJson(staffName)}`", "inline": true},""")
-        fieldsBuilder.append("""{"name": "⏱️ **Dauer**", "value": "`${escapeJson(durationStr)}`", "inline": true},""")
-        fieldsBuilder.append("""{"name": "📝 **Grund**", "value": "${escapeJson(reasonText)}", "inline": false},""")
-        fieldsBuilder.append("""{"name": "⌚ **Datum**", "value": "${escapeJson(timeFormatted)}", "inline": true}""")
+        fieldsBuilder.append("""{"name": "👤 **Spieler**", "value": "`${JsonUtil.escape(targetName)}`", "inline": true},""")
+        fieldsBuilder.append("""{"name": "🛡️ **Staff**", "value": "`${JsonUtil.escape(staffName)}`", "inline": true},""")
+        fieldsBuilder.append("""{"name": "⏱️ **Dauer**", "value": "`${JsonUtil.escape(durationStr)}`", "inline": true},""")
+        fieldsBuilder.append("""{"name": "📝 **Grund**", "value": "${JsonUtil.escape(reasonText)}", "inline": false},""")
+        fieldsBuilder.append("""{"name": "⌚ **Datum**", "value": "${JsonUtil.escape(timeFormatted)}", "inline": true}""")
 
         return """
         {
@@ -206,7 +208,7 @@ class DiscordWebhookService(
                 $fieldsBuilder
               ],
               "footer": {
-                "text": "Server: ${escapeJson(serverOrigin)} • BameLiteBans"
+                "text": "Server: ${JsonUtil.escape(serverOrigin)} • BameLiteBans"
               },
               "timestamp": "${Instant.now()}"
             }
@@ -225,17 +227,8 @@ class DiscordWebhookService(
         }
     }
 
-    private fun escapeJson(str: String): String {
-        return str.replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\b", "\\b")
-            .replace("\u000c", "\\f")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
-    }
-
     fun shutdown() {
         executor.shutdown()
     }
 }
+

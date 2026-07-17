@@ -41,7 +41,7 @@ class BameLiteBansPlugin @Inject constructor(
     private lateinit var aiModerationService: de.bame.bamelitebans.service.AiModerationService
     private val luckPermsService = LuckPermsService()
 
-    private val dbExecutor = Executors.newFixedThreadPool(4) { r ->
+    private val dbExecutor = Executors.newFixedThreadPool(20) { r ->
         Thread(r, "BameLiteBans-DB").apply { isDaemon = true }
     }
 
@@ -73,7 +73,6 @@ class BameLiteBansPlugin @Inject constructor(
             |____/ \__,_|_| |_| |_||______|_|\__\___|____/ \__,_|_| |_| |_| 
              v1.0.0 by Bame | High-Performance LiteBans Moderation Suite
         """.trimIndent())
-        logger.info("⚡ [BameLiteBans] Initialisiere Datenbank-Pool (4 Threads) & Tabellen-Sync...")
 
         configService = ConfigService(dataDirectory)
         historyService = LiteBansHistoryService(logger, luckPermsService = luckPermsService, executor = dbExecutor)
@@ -83,22 +82,15 @@ class BameLiteBansPlugin @Inject constructor(
 
         lastSeenService.initTable()
         proxy.eventManager.register(this, aiModerationService)
-        logger.info("✔ [BameLiteBans] KI / AutoModeration Engine (automod.toml) geladen & Event-Listener aktiv.")
 
         try {
             litebans.api.Events.get().register(liteBansListener)
-            if (configService.isWebhookEnabled) {
-                logger.info("✔ [BameLiteBans] Discord Webhook Service geladen & LiteBans Event-Listener aktiv.")
-            } else {
-                logger.info("✔ [BameLiteBans] LiteBans Event-Listener aktiv (Webhook aktuell in config.toml deaktiviert).")
-            }
         } catch (e: Exception) {
             logger.warn("⚠ [BameLiteBans] Konnte LiteBans API Listener nicht registrieren: ${e.message}")
         }
 
         val lamp = VelocityLamp.builder(this, proxy).build()
 
-        logger.info("✔ [BameLiteBans] Registriere Commands über Lamp Framework...")
         lamp.register(HistoryCommand(historyService, configService))
         lamp.register(StaffHistoryCommand(historyService, configService))
         lamp.register(StaffTopCommand(historyService, configService))
@@ -108,12 +100,6 @@ class BameLiteBansPlugin @Inject constructor(
 
         lamp.accept(VelocityVisitors.brigadier(proxy))
 
-        logger.info("✔ [Commands] ➜ /searchhistory (<spieler> [grund/seite])")
-        logger.info("✔ [Commands] ➜ /searchstaffhistory (<staff> [grund/seite])")
-        logger.info("✔ [Commands] ➜ /searchbanlist (<grund> [seite])")
-        logger.info("✔ [Commands] ➜ /stafftop ([day/week/month/all/own])")
-        logger.info("✔ [Commands] ➜ /lastseen (<spieler>)")
-        logger.info("✔ [Commands] ➜ /bamelitebans reload")
         logger.info("🚀 [BameLiteBans] Plugin erfolgreich geladen und einsatzbereit!")
     }
 
@@ -146,3 +132,4 @@ class BameLiteBansPlugin @Inject constructor(
         logger.info("✔ [BameLiteBans] Shutdown sauber abgeschlossen.")
     }
 }
+

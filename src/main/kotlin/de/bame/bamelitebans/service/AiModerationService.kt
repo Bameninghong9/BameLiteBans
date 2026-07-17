@@ -2,10 +2,12 @@ package de.bame.bamelitebans.service
 
 import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.event.player.PlayerChatEvent
+import com.velocitypowered.api.event.EventTask
 import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
 import de.bame.bamelitebans.config.ConfigService
 import de.bame.bamelitebans.util.ColorParser
+import de.bame.bamelitebans.util.JsonUtil
 import org.slf4j.Logger
 import java.net.URI
 import java.net.http.HttpClient
@@ -40,15 +42,21 @@ class AiModerationService(
     private val spamHistory = java.util.concurrent.ConcurrentHashMap<java.util.UUID, SpamTracker>()
 
     @Subscribe(order = com.velocitypowered.api.event.PostOrder.FIRST)
-    fun onPlayerChat(event: PlayerChatEvent) {
-        if (!configService.isAutoModEnabled) return
+    fun onPlayerChat(event: PlayerChatEvent): EventTask {
+        return EventTask.async {
+            processChatAsync(event)
+        }
+    }
+
+    private fun processChatAsync(event: PlayerChatEvent) {
+        if (!configService.automod.isEnabled) return
         val player = event.player
         if (player.hasPermission("bamelitebans.bypass.automod")) return
 
         val message = event.message
 
         // 0. Check Spam-Schutz
-        if (configService.isSpamEnabled) {
+        if (configService.automod.isSpamEnabled) {
             if (checkAndHandleSpam(event, player, message)) {
                 return
             }
@@ -58,8 +66,8 @@ class AiModerationService(
 
         if (localMatch != null) {
             event.result = PlayerChatEvent.ChatResult.message(" *** ")
-            if (configService.isMuteCategory(localMatch) && !configService.areMutesEnabled) {
-                player.sendMessage(ColorParser.parse(configService.mutesBlockedMessage))
+            if (configService.automod.isMuteCategory(localMatch) && !configService.automod.areMutesEnabled) {
+                player.sendMessage(ColorParser.parse(configService.automod.mutesBlockedMessage))
             } else {
                 executeAutoPunish(player, localMatch, message)
             }
@@ -67,7 +75,7 @@ class AiModerationService(
         }
 
         // Falls API-Key vorhanden, prüfe zusätzlich asynchron über KI-API
-        val apiKey = configService.aiApiKey
+        val apiKey = configService.automod.apiKey
         if (apiKey.isNotBlank()) {
             CompletableFuture.runAsync {
                 checkAiApi(player, message, apiKey)
@@ -78,7 +86,7 @@ class AiModerationService(
     private fun checkLocalHeuristics(message: String): String? {
         // 1. Check Werbung mit Allowed-Domain Filter
         if (patterns["werbung"]!!.containsMatchIn(message)) {
-            val allowed = configService.allowedAdvertisingDomains
+            val allowed = configService.automod.allowedAdvertisingDomains
             val cleanMessage = message.lowercase()
             val isAllowed = allowed.any { domain ->
                 domain.isNotBlank() && cleanMessage.contains(domain.lowercase().trim())
@@ -100,9 +108,9 @@ class AiModerationService(
 
     private fun checkAiApi(player: Player, message: String, apiKey: String) {
         try {
-            val apiUrl = configService.aiApiUrl.ifBlank { "https://api.openai.com/v1/chat/completions" }
-            val model = configService.aiModel.ifBlank { "gpt-4o-mini" }
-            val safeMsg = escapeJson(message)
+            val apiUrl = configService.automod.apiUrl.ifBlank { "https://api.openai.com/v1/chat/completions" }
+            val model = configService.automod.model.ifBlank { "gpt-4o-mini" }
+            val safeMsg = JsonUtil.escape(message)
 
             val jsonPayload = """
                 {
@@ -156,7 +164,7 @@ class AiModerationService(
     private fun checkAndHandleSpam(event: PlayerChatEvent, player: Player, message: String): Boolean {
         val now = System.currentTimeMillis()
         val cleanMsg = message.trim().lowercase()
-        val cooldownMs = configService.spamCooldownMinutes * 60_000L
+        val cooldownMs = configService.automod.spamCooldownMinutes * 60_000L
         val tracker = spamHistory[player.uniqueId]
 
         if (tracker == null || now - tracker.firstTimestamp > cooldownMs || tracker.text != cleanMsg) {
@@ -165,18 +173,18 @@ class AiModerationService(
         }
 
         tracker.count++
-        val maxDuplicates = configService.spamMaxDuplicates
+        val maxDuplicates = configService.automod.spamMaxDuplicates
 
         if (tracker.count > maxDuplicates) {
             event.result = PlayerChatEvent.ChatResult.message(" *** ")
-            player.sendMessage(ColorParser.parse(configService.spamPlayerMessage))
+            player.sendMessage(ColorParser.parse(configService.automod.spamPlayerMessage))
 
-            val staffMsg = ColorParser.parse(configService.spamStaffMessage.replace("%player%", player.username))
+            val staffMsg = ColorParser.parse(configService.automod.spamStaffMessage.replace("%player%", player.username))
             proxy.allPlayers.filter { it.hasPermission("bamelitebans.notify.automod") || it.hasPermission("bamelitebans.command.reload") }
                 .forEach { it.sendMessage(staffMsg) }
             proxy.consoleCommandSource.sendMessage(staffMsg)
 
-            val muteAfter = configService.spamMuteAfterAttempts
+            val muteAfter = configService.automod.spamMuteAfterAttempts
             if (muteAfter > 0 && tracker.count >= muteAfter) {
                 executeAutoPunish(player, "spam", message)
             }
@@ -186,12 +194,12 @@ class AiModerationService(
     }
 
     private fun executeAutoPunish(player: Player, category: String, message: String) {
-        if (configService.isMuteCategory(category) && !configService.areMutesEnabled) {
-            player.sendMessage(ColorParser.parse(configService.mutesBlockedMessage))
+        if (configService.automod.isMuteCategory(category) && !configService.automod.areMutesEnabled) {
+            player.sendMessage(ColorParser.parse(configService.automod.mutesBlockedMessage))
             return
         }
 
-        val rawCommand = configService.getAutoModCommand(category) ?: return
+        val rawCommand = configService.automod.getCommand(category) ?: return
         val commandToRun = rawCommand
             .replace("%player%", player.username)
             .replace("%message%", sanitizeForCommand(message))
@@ -203,8 +211,8 @@ class AiModerationService(
         logger.info("[AiModeration] Führe Auto-Punish aus: /$commandToRun (Kategorie: $category, Spieler: ${player.username})")
 
         proxy.commandManager.executeAsync(proxy.consoleCommandSource, commandToRun).thenAccept {
-            if (configService.notifyTeamAutoMod) {
-                val notifyMsg = configService.notifyMessageAutoMod
+            if (configService.automod.notifyTeam) {
+                val notifyMsg = configService.automod.notifyMessage
                     .replace("%player%", player.username)
                     .replace("%category%", category.uppercase())
                     .replace("%message%", ColorParser.escape(message))
@@ -224,14 +232,5 @@ class AiModerationService(
             .take(100)
             .trim()
     }
-
-    private fun escapeJson(input: String): String {
-        return input.replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\b", "\\b")
-            .replace("\u000C", "\\f") // \f corresponds to \u000C (Form feed) in Kotlin
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
-    }
 }
+

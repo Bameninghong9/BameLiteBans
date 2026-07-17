@@ -63,12 +63,12 @@ class LastSeenCommand(
             val serverStr = SmallCaps.convert(safeServer)
             val onlineStr = if (entry.isOnline) "<green>${SmallCaps.convert("[online]")}" else "<red>${SmallCaps.convert("[offline]")}"
 
-            val formattedMessage = configService.lastSeenFormat(
+            val formattedMessage = configService.messages.lastSeenFormat(
                 prefixName, warZuletztAm, dateStr, um, timeStr, auf, serverStr, onlineStr
             )
 
             actor.reply(ColorParser.parse(""))
-            actor.reply(ColorParser.parse(configService.lastSeenHeader()))
+            actor.reply(ColorParser.parse(configService.messages.lastSeenHeader()))
             actor.reply(ColorParser.parse(formattedMessage))
             actor.reply(ColorParser.parse(""))
         }.exceptionally { e ->
@@ -78,3 +78,4 @@ class LastSeenCommand(
         }
     }
 }
+

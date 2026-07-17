@@ -31,7 +31,4 @@ object CommandUtil {
         return trimmed to defaultNumber
     }
 
-    fun parseReasonAndLimit(rawReason: String?, defaultLimit: Int = 100): Pair<String?, Int> {
-        return parseReasonAndNumber(rawReason, defaultLimit)
-    }
 }

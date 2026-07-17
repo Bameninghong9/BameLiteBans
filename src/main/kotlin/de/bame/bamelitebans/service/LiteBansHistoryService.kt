@@ -18,7 +18,7 @@ class LiteBansHistoryService(
 ) {
 
     companion object {
-        private val UUID_PATTERN = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+        val UUID_PATTERN = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
     }
 
     /**
@@ -49,11 +49,6 @@ class LiteBansHistoryService(
     /**
      * Lädt asynchron die gesamte Strafen-Historie eines Spielers und filtert optional nach einem Suchbegriff im Grund.
      */
-    fun fetchHistory(playerName: String, keyword: String?): CompletableFuture<List<PunishmentEntry>> {
-        val keywords = if (keyword.isNullOrBlank()) emptyList() else listOf(keyword)
-        return fetchHistory(playerName, keywords)
-    }
-
     fun fetchHistory(playerName: String, keywords: List<String>): CompletableFuture<List<PunishmentEntry>> {
         return CompletableFuture.supplyAsync({
             val uuid = resolvePlayerUuid(playerName) ?: return@supplyAsync emptyList()
@@ -66,20 +61,22 @@ class LiteBansHistoryService(
             entries.addAll(queryTable(uuid, playerName, "{warnings}", PunishmentType.WARN))
             entries.addAll(queryTable(uuid, playerName, "{kicks}", PunishmentType.KICK))
 
-            // Nach Keywords filtern (falls angegeben)
-            val filtered = if (keywords.isNotEmpty()) {
-                entries.filter { entry ->
-                    keywords.any { kw -> entry.reason.contains(kw, ignoreCase = true) }
-                }
-            } else {
-                entries
-            }
-
-            // Chronologisch absteigend sortieren und Duplikate ausschließen
-            filtered
-                .distinctBy { "${it.type}_${it.id}" }
-                .sortedWith(compareByDescending<PunishmentEntry> { it.timestampMillis }.thenByDescending { it.id })
+            filterAndSort(entries, keywords)
         }, executor)
+    }
+
+    private fun filterAndSort(entries: List<PunishmentEntry>, keywords: List<String>): List<PunishmentEntry> {
+        val filtered = if (keywords.isNotEmpty()) {
+            entries.filter { entry ->
+                keywords.any { kw -> entry.reason.contains(kw, ignoreCase = true) }
+            }
+        } else {
+            entries
+        }
+
+        return filtered
+            .distinctBy { "${it.type}_${it.id}" }
+            .sortedWith(compareByDescending<PunishmentEntry> { it.timestampMillis }.thenByDescending { it.id })
     }
 
     private fun safeGetString(rs: ResultSet, col: String): String? {
@@ -192,34 +189,24 @@ class LiteBansHistoryService(
         return uuid
     }
 
-    fun fetchStaffHistory(staffNameOrUuid: String, keyword: String?): CompletableFuture<List<PunishmentEntry>> {
-        val keywords = if (keyword.isNullOrBlank()) emptyList() else listOf(keyword)
-        return fetchStaffHistory(staffNameOrUuid, keywords)
-    }
-
     fun fetchStaffHistory(staffNameOrUuid: String, keywords: List<String>): CompletableFuture<List<PunishmentEntry>> {
         return CompletableFuture.supplyAsync({
+            val staffName = if (staffNameOrUuid.matches(UUID_PATTERN)) {
+                resolvePlayerName(staffNameOrUuid)
+            } else {
+                staffNameOrUuid
+            }
             val staffUuid = resolvePlayerUuid(staffNameOrUuid) ?: staffNameOrUuid
 
             val entries = mutableListOf<PunishmentEntry>()
             val nameCache = mutableMapOf<String, String>()
 
-            entries.addAll(queryStaffTable(staffNameOrUuid, staffUuid, "{bans}", PunishmentType.BAN, nameCache))
-            entries.addAll(queryStaffTable(staffNameOrUuid, staffUuid, "{mutes}", PunishmentType.MUTE, nameCache))
-            entries.addAll(queryStaffTable(staffNameOrUuid, staffUuid, "{warnings}", PunishmentType.WARN, nameCache))
-            entries.addAll(queryStaffTable(staffNameOrUuid, staffUuid, "{kicks}", PunishmentType.KICK, nameCache))
+            entries.addAll(queryStaffTable(staffName, staffUuid, "{bans}", PunishmentType.BAN, nameCache))
+            entries.addAll(queryStaffTable(staffName, staffUuid, "{mutes}", PunishmentType.MUTE, nameCache))
+            entries.addAll(queryStaffTable(staffName, staffUuid, "{warnings}", PunishmentType.WARN, nameCache))
+            entries.addAll(queryStaffTable(staffName, staffUuid, "{kicks}", PunishmentType.KICK, nameCache))
 
-            val filtered = if (keywords.isNotEmpty()) {
-                entries.filter { entry ->
-                    keywords.any { kw -> entry.reason.contains(kw, ignoreCase = true) }
-                }
-            } else {
-                entries
-            }
-
-            filtered
-                .distinctBy { "${it.type}_${it.id}" }
-                .sortedWith(compareByDescending<PunishmentEntry> { it.timestampMillis }.thenByDescending { it.id })
+            filterAndSort(entries, keywords)
         }, executor)
     }
 
@@ -231,7 +218,7 @@ class LiteBansHistoryService(
         nameCache: MutableMap<String, String>
     ): List<PunishmentEntry> {
         val list = mutableListOf<PunishmentEntry>()
-        val query = "SELECT * FROM $tableToken WHERE LOWER(banned_by_name)=LOWER(?) OR banned_by_uuid=?"
+        val query = "SELECT * FROM $tableToken WHERE LOWER(banned_by_name)=LOWER(?) OR banned_by_uuid=? LIMIT 5000"
 
         try {
             Database.get().prepareStatement(query).use { st ->
